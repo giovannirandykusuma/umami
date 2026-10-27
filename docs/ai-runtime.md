@@ -12,8 +12,17 @@ Required server settings: `AI_PROVIDER`, `AI_MODEL`, `AI_BASE_URL`,
 `AI_PROVIDER_KEY`, and `AI_EGRESS_ORIGINS` equal to the single HTTPS origin of
 `AI_BASE_URL` (which may include a `/v1` path). These are never client parameters.
 A fixed OpenAI-completions `models.json` is generated in mode-0600 per-turn scratch,
-using `$AI_PROVIDER_KEY` environment interpolation, text-only input, no reasoning,
-`supportsDeveloperRole: false` and `maxTokensField: max_tokens`. Arbitrary native
+using `$AI_PROVIDER_KEY` environment interpolation and text-only input. The model
+has `reasoning: true` and `thinkingLevelMap` mapping `off: "none"`,
+`minimal: null` (unsupported), `low: "low"`, `medium: "medium"`, `high: "high"`,
+and `xhigh: "xhigh"`. Compatibility is fixed to `supportsStore: false`,
+`supportsDeveloperRole: false`, `supportsReasoningEffort: true`,
+`maxTokensField: "max_tokens"`, and `thinkingFormat: "openai"`.
+Optional server-only `AI_REASONING_LEVEL` defaults to `medium`; only `off`, `low`,
+`medium`, `high`, and `xhigh` are accepted. Empty/unknown/unsupported levels fail
+before child launch. The host explicitly passes `--thinking <level>` and allowlists
+this setting in the child environment; clients cannot choose it. The native CLI
+is unchanged. Arbitrary native
 config, commands, paths, headers and client fields are not accepted. The key is
 not written to disk or placed on the process command line. No inherited developer authentication,
 PATH, NODE_OPTIONS, proxy settings, resource settings, or unrelated secrets enter
@@ -121,14 +130,20 @@ turn and concurrency limits, deadlines, abort, kill/reap, cleanup and env isolat
 Native-shaped regressions cover denied/unknown tools without host UI, failed reads,
 malformed tool IDs/names/error flags, proposal followed by aborted settlement,
 malformed/missing abort flags, and a successful tool outcome.
-Three confinement tests additionally exercise generated configuration rejection,
+Confinement tests additionally exercise strict reasoning selection and generated configuration rejection,
 preflight rejection of planted ancestor credentials/models/extensions, and
 real Node permission denials for app/repository/home reads, outside writes,
 subprocesses and workers. The suite also attempts the installed native CLI smoke
 (the local integration test's installation path is explicit). The smoke has no provider key and never sends a
 prompt. It verifies `get_state` ID/command/success, idle state, extension startup,
 exactly the four active tools and clean stderr, then kills/reaps and cleans up.
-No actual provider/model request or production analytics was tested.
+The same smoke separately invokes the pinned public Pi OpenAI-completions adapter
+with an injected offline fetch and synthetic SSE response. It captures the actual
+serialized request URL/body, asserting `reasoning_effort: "medium"`, `stream: true`,
+`max_tokens`, no `store`/developer role, and parsed assistant text/stop. Native
+`get_state` also confirms `thinkingLevel: "medium"`. No external provider/model
+request or production analytics was tested. Reasoning parity is not proof that
+this configuration resolves any live gateway 503; live acceptance is separate.
 
 Implementation references read from installed Pi 1.4.0: README; docs/rpc.md,
 docs/sdk.md, docs/extensions.md; CLI flags and resource controls (cli.md), RPC

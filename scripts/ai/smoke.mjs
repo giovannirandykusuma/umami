@@ -1,10 +1,15 @@
-// Credential-free actual pinned CLI protocol/resource smoke. Never sends a prompt.
+// Credential-free pinned CLI and public transport smoke. No external provider calls.
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
-import { gatewayConfig, permissionArgs } from '../../src/lib/ai/rpc/confinement.mjs';
+import {
+  gatewayConfig,
+  permissionArgs,
+  reasoningLevel,
+} from '../../src/lib/ai/rpc/confinement.mjs';
 const home = await mkdtemp(join(tmpdir(), 'pi-native-smoke-'));
 const gateway = {
   AI_PROVIDER: 'smoke-gateway',
@@ -12,6 +17,76 @@ const gateway = {
   AI_BASE_URL: 'https://gateway.invalid/v1',
   AI_EGRESS_ORIGINS: 'https://gateway.invalid',
 };
+// Exercise Pi's real OpenAI transport with an injected offline fetch. The URL is
+// synthetic HTTPS; no network, credentials, or TLS exceptions are needed.
+const { streamSimple } = await import(
+  pathToFileURL(
+    join(
+      process.env.AI_PI_ROOT,
+      'node_modules/@earendil-works/pi-ai/dist/api/openai-completions.js',
+    ),
+  ).href
+);
+const model = {
+  ...gatewayConfig(gateway).providers[gateway.AI_PROVIDER].models[0],
+  provider: gateway.AI_PROVIDER,
+  api: 'openai-completions',
+  baseUrl: gateway.AI_BASE_URL,
+  name: gateway.AI_MODEL,
+  contextWindow: 32000,
+  maxTokens: 1024,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+};
+let captured = 0;
+let request;
+const transport = streamSimple(
+  model,
+  {
+    messages: [
+      { role: 'system', content: 'Synthetic system instruction.', timestamp: 0 },
+      { role: 'user', content: 'Synthetic offline prompt.', timestamp: 0 },
+    ],
+  },
+  {
+    apiKey: 'synthetic-not-a-credential',
+    reasoning: reasoningLevel(gateway),
+    fetch: async (url, init) => {
+      captured++;
+      request = { url: String(url), body: JSON.parse(init.body) };
+      const chunk = delta =>
+        `data: ${JSON.stringify({
+          id: 'offline',
+          object: 'chat.completion.chunk',
+          created: 0,
+          model: gateway.AI_MODEL,
+          choices: [{ index: 0, ...delta }],
+        })}\n\n`;
+      return new Response(
+        chunk({ delta: { role: 'assistant', content: 'Offline response.' }, finish_reason: null }) +
+          chunk({ delta: {}, finish_reason: 'stop' }) +
+          'data: [DONE]\n\n',
+        { headers: { 'content-type': 'text/event-stream' } },
+      );
+    },
+  },
+);
+const response = await transport.result();
+assert.equal(captured, 1);
+assert.equal(request.url, 'https://gateway.invalid/v1/chat/completions');
+assert.equal(request.body.model, gateway.AI_MODEL);
+assert.equal(request.body.reasoning_effort, 'medium');
+assert.equal(request.body.stream, true);
+assert.equal(request.body.store, undefined);
+assert.equal(request.body.max_tokens, 1024);
+assert.equal(request.body.max_completion_tokens, undefined);
+assert.equal(request.body.messages[0].role, 'system');
+assert.equal(
+  request.body.messages.some(message => message.role === 'developer'),
+  false,
+);
+assert.equal(response.stopReason, 'stop', response.errorMessage);
+assert.deepEqual(response.content, [{ type: 'text', text: 'Offline response.' }]);
+console.log('Public Pi OpenAI transport captured reasoning_effort=medium, stream=true offline.');
 await mkdir(join(home, 'agent'));
 await writeFile(join(home, 'agent/models.json'), JSON.stringify(gatewayConfig(gateway)), {
   mode: 0o600,
@@ -75,6 +150,8 @@ const child = spawn(
     gateway.AI_PROVIDER,
     '--model',
     gateway.AI_MODEL,
+    '--thinking',
+    reasoningLevel(gateway),
   ],
   {
     cwd: home,
@@ -123,6 +200,7 @@ try {
           assert.equal(value.command, 'get_state');
           assert.equal(value.success, true);
           assert.equal(value.data.isStreaming, false);
+          assert.equal(value.data.thinkingLevel, 'medium');
           clearTimeout(timer);
           resolveDone();
         } catch (error) {

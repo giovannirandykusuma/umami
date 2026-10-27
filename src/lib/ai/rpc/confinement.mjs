@@ -56,7 +56,15 @@ export function permissionArgs({ root, scratch, bridge, extension }) {
   return args;
 }
 
+export function reasoningLevel(env) {
+  const level = env.AI_REASONING_LEVEL ?? 'medium';
+  if (!['off', 'low', 'medium', 'high', 'xhigh'].includes(level))
+    throw new Error('Invalid AI reasoning level');
+  return level;
+}
+
 export function gatewayConfig(env) {
+  reasoningLevel(env);
   const {
     AI_PROVIDER: provider,
     AI_MODEL: model,
@@ -97,8 +105,22 @@ export function gatewayConfig(env) {
           {
             id: model,
             input: ['text'],
-            reasoning: false,
-            compat: { supportsDeveloperRole: false, maxTokensField: 'max_tokens' },
+            reasoning: true,
+            thinkingLevelMap: {
+              off: 'none',
+              minimal: null,
+              low: 'low',
+              medium: 'medium',
+              high: 'high',
+              xhigh: 'xhigh',
+            },
+            compat: {
+              supportsStore: false,
+              supportsDeveloperRole: false,
+              supportsReasoningEffort: true,
+              maxTokensField: 'max_tokens',
+              thinkingFormat: 'openai',
+            },
           },
         ],
       },

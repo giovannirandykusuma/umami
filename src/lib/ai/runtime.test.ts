@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AI_LIMITS, runAiTurn, runIsolatedTurn, type AiEvent } from './runtime';
-import { gatewayConfig, permissionArgs } from './rpc/confinement.mjs';
+import { gatewayConfig, permissionArgs, reasoningLevel } from './rpc/confinement.mjs';
 
 const bridge = resolve('src/lib/ai/rpc/fixture.mjs');
 const executeTool = vi.fn(async () => ({ ok: true }));
@@ -38,8 +38,22 @@ describe('confinement', () => {
             {
               id: 'test-model',
               input: ['text'],
-              reasoning: false,
-              compat: { supportsDeveloperRole: false, maxTokensField: 'max_tokens' },
+              reasoning: true,
+              thinkingLevelMap: {
+                off: 'none',
+                minimal: null,
+                low: 'low',
+                medium: 'medium',
+                high: 'high',
+                xhigh: 'xhigh',
+              },
+              compat: {
+                supportsStore: false,
+                supportsDeveloperRole: false,
+                supportsReasoningEffort: true,
+                maxTokensField: 'max_tokens',
+                thinkingFormat: 'openai',
+              },
             },
           ],
         },
@@ -56,6 +70,20 @@ describe('confinement', () => {
       { AI_EGRESS_ORIGINS: 'https://gateway.invalid,https://elsewhere.invalid' },
     ])
       expect(() => gatewayConfig({ ...env, ...extra })).toThrow();
+  });
+  it('defaults to medium and rejects unsupported server reasoning before launch', async () => {
+    expect(reasoningLevel({})).toBe('medium');
+    for (const level of ['off', 'low', 'medium', 'high', 'xhigh'])
+      expect(reasoningLevel({ AI_REASONING_LEVEL: level })).toBe(level);
+    for (const level of ['', 'minimal', 'max', 'MEDIUM', 'medium ', '--help']) {
+      expect(() => reasoningLevel({ AI_REASONING_LEVEL: level })).toThrow('reasoning level');
+      await expect(
+        runIsolatedTurn(
+          { messages: [{ role: 'user', content: 'test' }], executeTool },
+          { bridge: '/nonexistent-must-not-launch.mjs', env: { AI_REASONING_LEVEL: level } },
+        ),
+      ).rejects.toThrow('Invalid AI reasoning level');
+    }
   });
   it('rejects planted ancestor credentials and extensions before granting discovery access', async () => {
     const parent = await mkdtemp(join(tmpdir(), 'ai-ancestor-'));
@@ -240,6 +268,7 @@ describe('bounded isolated AI runtime (synthetic RPC only)', () => {
       timeout: 20000,
     }).toString();
     expect(output).toContain('native RPC get_state correlated');
+    expect(output).toContain('reasoning_effort=medium, stream=true offline');
   }, 25000);
   it('enforces concurrency and recovers slots after timeout', async () => {
     const requests = [turn('timeout', {}, 100), turn('timeout', {}, 100)];
