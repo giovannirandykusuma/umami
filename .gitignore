@@ -6,6 +6,7 @@ node_modules
 .pnp.js
 .pnpm-store
 package-lock.json
+!/scripts/ai/install/package-lock.json
 
 # testing
 /shots

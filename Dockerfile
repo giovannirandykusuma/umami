@@ -3,6 +3,12 @@ ARG PNPM_VERSION="12.3.4"
 # Keep in sync with the prisma/@prisma/* versions in package.json
 ARG PRISMA_VERSION="7.10.0"
 
+# Dedicated flat native runtime install avoids pnpm store symlink permission grants.
+FROM node:${NODE_IMAGE_VERSION} AS ai-runtime
+WORKDIR /opt/umami-ai
+COPY scripts/ai/install/package.json scripts/ai/install/package-lock.json ./
+RUN npm ci --install-strategy=nested --ignore-scripts
+
 # Install dependencies only when needed
 FROM node:${NODE_IMAGE_VERSION} AS deps
 ARG PNPM_VERSION
@@ -69,8 +75,7 @@ RUN set -x \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Pinned native RPC runtime; no request-time downloads or inherited host install.
-RUN mkdir -p /opt/umami-ai \
-    && pnpm add --dir /opt/umami-ai --ignore-scripts --save-exact @earendil-works/pi-coding-agent@1.4.0
+COPY --from=ai-runtime /opt/umami-ai /opt/umami-ai
 ENV AI_PI_ROOT=/opt/umami-ai/node_modules/@earendil-works/pi-coding-agent
 
 RUN echo {} > package.json
