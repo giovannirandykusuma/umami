@@ -33,11 +33,15 @@ export function permissionArgs({ root, scratch, bridge, extension }) {
     ]) {
       reads.push(join(dirname(installed), entry));
     }
-    reads.push(
-      join(installed, 'package.json'),
-      join(installed, 'dist'),
-      join(installed, 'node_modules'),
-    );
+    // Node 22 checks lexical fs paths as well as canonical module paths. pnpm's
+    // public package symlink must not require granting its node_modules parent.
+    for (const packageRoot of new Set([root, installed])) {
+      reads.push(
+        join(packageRoot, 'package.json'),
+        join(packageRoot, 'dist'),
+        join(packageRoot, 'node_modules'),
+      );
+    }
   }
   const args = [
     '--disable-warning=ExperimentalWarning',

@@ -1,5 +1,5 @@
 // Credential-free actual pinned CLI protocol/resource smoke. Never sends a prompt.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -16,6 +16,37 @@ await mkdir(join(home, 'agent'));
 await writeFile(join(home, 'agent/models.json'), JSON.stringify(gatewayConfig(gateway)), {
   mode: 0o600,
 });
+// Synthetic adjacent file is outside the per-turn writable/readable scratch.
+const adjacentSecret = home + '-secret';
+await writeFile(adjacentSecret, 'synthetic-not-a-credential');
+const probe = spawnSync(
+  process.execPath,
+  [
+    ...permissionArgs({
+      root: process.env.AI_PI_ROOT,
+      scratch: home,
+      bridge: resolve('scripts/ai/native.mjs'),
+      extension: resolve('scripts/ai/host-tools.mjs'),
+    }),
+    '--input-type=module',
+  ],
+  {
+    cwd: home,
+    env: {},
+    input: `import { readFileSync, writeFileSync } from 'node:fs';
+      import assert from 'node:assert/strict';
+      for (const path of ${JSON.stringify([adjacentSecret, resolve('package.json')])}) {
+        assert.throws(() => readFileSync(path), { code: 'ERR_ACCESS_DENIED' });
+        assert.throws(() => writeFileSync(path, 'forbidden'), { code: 'ERR_ACCESS_DENIED' });
+      }
+      console.log('Adjacent secret and application manifest denied');`,
+    encoding: 'utf8',
+    timeout: 5000,
+  },
+);
+await rm(adjacentSecret, { force: true });
+assert.equal(probe.status, 0, probe.stderr);
+console.log(probe.stdout.trim());
 const child = spawn(
   process.execPath,
   [
