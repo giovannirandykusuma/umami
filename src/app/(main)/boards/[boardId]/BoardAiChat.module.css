@@ -1,0 +1,89 @@
+.panel {
+  border: 1px solid var(--base400);
+  border-radius: var(--border-radius);
+  padding: 20px;
+  margin: 16px 0 24px;
+  min-width: 0;
+}
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.heading h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.heading span,
+.help {
+  color: var(--base700);
+  font-size: 13px;
+}
+
+.help {
+  margin: 8px 0 16px;
+  line-height: 1.6;
+}
+
+.messages {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.message {
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+.message p {
+  white-space: pre-wrap;
+  margin: 4px 0;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--base400);
+  border-radius: var(--border-radius);
+  background: var(--base50);
+  color: var(--base900);
+  font: inherit;
+  resize: vertical;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--primary400);
+  outline-offset: 2px;
+}
+
+.input:disabled {
+  opacity: 0.6;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.status {
+  min-height: 20px;
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .panel {
+    padding: 12px;
+  }
+}

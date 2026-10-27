@@ -17,6 +17,9 @@ export interface BoardContextValue {
   saveBoard: () => Promise<Board>;
   isPending: boolean;
   registerLayoutGetter: (getter: LayoutGetter) => void;
+  aiPending?: boolean;
+  setAiPending?: (pending: boolean) => void;
+  registerAiCancel?: (cancel: (() => void) | null) => void;
 }
 
 export const BoardContext = createContext<BoardContextValue>(null);
@@ -72,6 +75,16 @@ export function BoardProvider({
   const [board, setBoard] = useState<Partial<Board>>(data ?? createDefaultBoard());
   const boardRef = useRef<Partial<Board>>(data ?? createDefaultBoard());
   const layoutGetterRef = useRef<LayoutGetter | null>(null);
+  const aiCancelRef = useRef<(() => void) | null>(null);
+  const aiPendingRef = useRef(false);
+  const [aiPending, setPending] = useState(false);
+  const setAiPending = useCallback((pending: boolean) => {
+    aiPendingRef.current = pending;
+    setPending(pending);
+  }, []);
+  const registerAiCancel = useCallback((cancel: (() => void) | null) => {
+    aiCancelRef.current = cancel;
+  }, []);
 
   const registerLayoutGetter = useCallback((getter: LayoutGetter) => {
     layoutGetterRef.current = getter;
@@ -79,6 +92,7 @@ export function BoardProvider({
 
   useEffect(() => {
     if (data) {
+      aiCancelRef.current?.();
       const nextBoard = {
         ...data,
         type: getBoardType(data, { coerceDashboard: true }),
@@ -105,6 +119,7 @@ export function BoardProvider({
   });
 
   const updateBoard = useCallback((data: Partial<Board>) => {
+    aiCancelRef.current?.();
     setBoard(current => {
       const nextBoard = { ...current, ...data };
       boardRef.current = nextBoard;
@@ -114,6 +129,7 @@ export function BoardProvider({
   }, []);
 
   const saveBoard = useCallback(async () => {
+    if (aiPendingRef.current) throw new Error('Cancel AI assistance before saving.');
     const currentBoard = boardRef.current;
     const defaultName = t(labels.untitled);
 
@@ -147,7 +163,17 @@ export function BoardProvider({
 
   return (
     <BoardContext.Provider
-      value={{ board, editing, updateBoard, saveBoard, isPending, registerLayoutGetter }}
+      value={{
+        board,
+        editing,
+        updateBoard,
+        saveBoard,
+        isPending,
+        registerLayoutGetter,
+        aiPending,
+        setAiPending,
+        registerAiCancel,
+      }}
     >
       {children}
     </BoardContext.Provider>

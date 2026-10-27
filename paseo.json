@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "ai-ui-fixture": {
+      "command": "AI_ENABLED=false DATABASE_URL=postgresql://synthetic:synthetic@127.0.0.1:1/synthetic npx --yes pnpm@12.3.4 exec next dev --hostname 127.0.0.1 --port 3317",
+      "type": "service"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+- img
+- text: umami
+- button
+- button "Dashboard"
+- button "Boards"
+- button "Websites"
+- button "Links"
+- button "Pixels"
+- button "Synthetic editor"
+- button "Synthetic editor"
+- combobox: Synthetic board
+- heading "Synthetic board" [level=2]
+- button "Cancel"
+- button "Save"
+- region "AI board assistant":
+  - heading "AI board assistant" [level=2]
+  - text: Draft preview only
+  - paragraph: Ask for a website summary, breakdown or daily pageviews chart. Choose a website in your request. AI can make mistakes. Only Save keeps changes. Chat clears when you leave or refresh.
+  - log "Board AI conversation":
+    - strong: You
+    - paragraph: Create a website summary
+    - strong: Assistant
+    - paragraph: Added a summary to your local draft. Review the layout before saving.
+  - text: Describe your board or a change
+  - textbox "Describe your board or a change":
+    - /placeholder: Show daily pageviews and top pages for my website
+  - button "Ask AI" [disabled]
+  - button "Clear chat"
+  - status: Draft preview updated. Review it, then choose Save to keep changes.
+- text: Website summary — local draft preview
+- separator
+- button
+- region "Notifications"
+- alert

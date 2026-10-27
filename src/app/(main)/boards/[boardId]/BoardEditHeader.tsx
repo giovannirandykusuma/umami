@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { useBoard, useMessages, useNavigation } from '@/components/hooks';
 
 export function BoardDesignHeader() {
-  const { board, saveBoard, isPending } = useBoard();
+  const { board, saveBoard, isPending, aiPending } = useBoard();
   const { t, labels } = useMessages();
   const { router, renderUrl } = useNavigation();
   const title = board?.name || t(labels.untitled);
@@ -29,7 +29,12 @@ export function BoardDesignHeader() {
         <Button variant="quiet" onPress={handleCancel}>
           {t(labels.cancel)}
         </Button>
-        <LoadingButton variant="primary" onPress={handleSave} isLoading={isPending}>
+        <LoadingButton
+          variant="primary"
+          onPress={handleSave}
+          isLoading={isPending}
+          isDisabled={aiPending}
+        >
           {t(labels.save)}
         </LoadingButton>
       </Row>

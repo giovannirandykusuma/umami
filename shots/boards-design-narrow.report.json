@@ -1,0 +1,56 @@
+{
+  "route": "/boards/22222222-2222-4222-8222-222222222222/design",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "screenshot": "shots/boards-design-narrow.png",
+  "baseline": null,
+  "diffPercentage": null,
+  "diffPng": null,
+  "baselineReason": "No base-commit synthetic capture server supplied. This is an additive assistant, not a full route redesign; no invented baseline or percentage.",
+  "snapshotDelta": {
+    "before": "- button\n- img\n- text: umami\n- button \"Synthetic editor\"\n- combobox: Synthetic board\n- heading \"Synthetic board\" [level=2]\n- button \"Cancel\"\n- button \"Save\"\n- region \"AI board assistant\":\n  - heading \"AI board assistant\" [level=2]\n  - text: Draft preview only\n  - paragraph: Ask for a website summary, breakdown or daily pageviews chart. Choose a website in your request. AI can make mistakes. Only Save keeps changes. Chat clears when you leave or refresh.\n  - text: Describe your board or a change\n  - textbox \"Describe your board or a change\":\n    - /placeholder: Show daily pageviews and top pages for my website\n  - button \"Ask AI\" [disabled]\n  - button \"Clear chat\" [disabled]\n  - status\n- button\n- separator\n- button\n- region \"Notifications\"\n- alert",
+    "after": "- button\n- img\n- text: umami\n- button \"Synthetic editor\"\n- combobox: Synthetic board\n- heading \"Synthetic board\" [level=2]\n- button \"Cancel\"\n- button \"Save\"\n- region \"AI board assistant\":\n  - heading \"AI board assistant\" [level=2]\n  - text: Draft preview only\n  - paragraph: Ask for a website summary, breakdown or daily pageviews chart. Choose a website in your request. AI can make mistakes. Only Save keeps changes. Chat clears when you leave or refresh.\n  - log \"Board AI conversation\":\n    - strong: You\n    - paragraph: Create a website summary\n    - strong: Assistant\n    - paragraph: Added a summary to your local draft. Review the layout before saving.\n  - text: Describe your board or a change\n  - textbox \"Describe your board or a change\":\n    - /placeholder: Show daily pageviews and top pages for my website\n  - button \"Ask AI\" [disabled]\n  - button \"Clear chat\"\n  - status: Draft preview updated. Review it, then choose Save to keep changes.\n- text: Website summary — local draft preview\n- separator\n- button\n- region \"Notifications\"\n- alert"
+  },
+  "agentSnapshot": "- button [expanded=false, ref=e1]\n- generic\n  - generic\n    - button \"Synthetic editor\" [expanded=false, ref=e7]\n    - combobox [expanded=false, ref=e8]: Synthetic board\n  - heading \"Synthetic board\" [level=2, ref=e3]\n  - button \"Cancel\" [ref=e4]\n  - button \"Save\" [ref=e5]\n  - region \"AI board assistant\" [ref=e6]\n    - heading \"AI board assistant\" [level=2, ref=e9]\n    - StaticText \"Draft preview only\"\n    - paragraph\n    - log \"Board AI conversation\"\n    - form\n      - textbox \"Describe your board or a change\" [ref=e11]\n      - button \"Ask AI\" [disabled, ref=e12]\n      - button \"Clear chat\" [ref=e13]\n  - generic\n    - separator [ref=e10] focusable [tabindex]: 50\n    - button [ref=e14]\n- region \"Notifications\" [ref=e2]\n- button \"Open Next.js Dev Tools\" [expanded=false, ref=e15]\n",
+  "consoleErrors": [],
+  "pageErrors": [],
+  "measurements": {
+    "viewportWidth": 390,
+    "documentWidth": 390,
+    "horizontalOverflowPx": 0,
+    "panelWidth": 366,
+    "inputWidth": 342,
+    "inputRight": 366,
+    "buttons": [
+      {
+        "text": "Ask AI",
+        "rect": {
+          "x": 24,
+          "y": 684.1875,
+          "width": 76.71875,
+          "height": 36,
+          "top": 684.1875,
+          "right": 100.71875,
+          "bottom": 720.1875,
+          "left": 24
+        }
+      },
+      {
+        "text": "Clear chat",
+        "rect": {
+          "x": 108.71875,
+          "y": 684.1875,
+          "width": 102.46875,
+          "height": 36,
+          "top": 684.1875,
+          "right": 211.1875,
+          "bottom": 720.1875,
+          "left": 108.71875
+        }
+      }
+    ],
+    "overlappingButtons": []
+  }
+}
