@@ -1,0 +1,17 @@
+{
+  "stackVersion": "0.1.0",
+  "driver": "paseo",
+  "autonomy": "auto",
+  "maxLanes": 4,
+  "base": "master",
+  "ui": true,
+  "test": { "cmd": "auto", "full": "pnpm exec vitest run", "coverage": null },
+  "roles": {
+    "main": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
+    "worker": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
+    "worker-hard": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
+    "judge": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
+    "probe": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
+    "ui-judge": { "model": "cx/gpt-6.1-sol", "thinking": "medium" }
+  }
+}
