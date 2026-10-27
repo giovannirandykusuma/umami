@@ -6,6 +6,7 @@ import { StringDecoder } from 'node:string_decoder';
 import type { BoardParameters } from '../types';
 import { validateBoardDraft } from './board-draft';
 import { AI_LIMITS, AI_READ_TOOLS, type AiTurn } from './rpc/contract';
+import { gatewayConfig, permissionArgs } from './rpc/confinement.mjs';
 
 export { AI_LIMITS, AI_READ_TOOLS } from './rpc/contract';
 export type { AiReadTool, AiEvent, AiTurn } from './rpc/contract';
@@ -19,12 +20,14 @@ function configuration() {
     'AI_PI_ROOT',
     'AI_PROVIDER',
     'AI_MODEL',
+    'AI_BASE_URL',
     'AI_PROVIDER_KEY',
     'AI_EGRESS_ORIGINS',
   ]) {
     if (!env[key]) throw new Error('AI configuration incomplete');
   }
   if (!isAbsolute(env.AI_PI_ROOT!)) throw new Error('AI installation must be absolute');
+  gatewayConfig(env);
   const origins = env.AI_EGRESS_ORIGINS!.split(',');
   try {
     if (
@@ -39,6 +42,7 @@ function configuration() {
     AI_PI_ROOT: env.AI_PI_ROOT!,
     AI_PROVIDER: env.AI_PROVIDER!,
     AI_MODEL: env.AI_MODEL!,
+    AI_BASE_URL: env.AI_BASE_URL!,
     AI_PROVIDER_KEY: env.AI_PROVIDER_KEY!,
     AI_EGRESS_ORIGINS: origins.join(','),
   };
@@ -83,15 +87,20 @@ export async function runIsolatedTurn(
     directory = await mkdtemp(join(tmpdir(), 'umami-ai-'));
     const home = directory;
     await mkdir(join(home, 'agent'));
-    if (options.env.AI_PROVIDER_KEY)
-      await writeFile(
-        join(home, 'agent/auth.json'),
-        JSON.stringify({
-          [options.env.AI_PROVIDER]: { type: 'api_key', key: options.env.AI_PROVIDER_KEY },
-        }),
-        { mode: 0o600 },
-      );
+    const native = options.bridge === resolve('scripts/ai/native.mjs');
+    if (native)
+      await writeFile(join(home, 'agent/models.json'), JSON.stringify(gatewayConfig(options.env)), {
+        mode: 0o600,
+      });
     const args = [
+      ...(native
+        ? permissionArgs({
+            root: options.env.AI_PI_ROOT,
+            scratch: directory,
+            bridge: options.bridge,
+            extension: resolve('scripts/ai/host-tools.mjs'),
+          })
+        : []),
       options.bridge,
       '--mode',
       'rpc',
@@ -117,7 +126,18 @@ export async function runIsolatedTurn(
     const child = spawn(process.execPath, args, {
       cwd: directory,
       env: {
-        ...options.env,
+        ...(native
+          ? Object.fromEntries(
+              [
+                'AI_PI_ROOT',
+                'AI_PROVIDER',
+                'AI_MODEL',
+                'AI_BASE_URL',
+                'AI_PROVIDER_KEY',
+                'AI_EGRESS_ORIGINS',
+              ].map(key => [key, options.env[key]]),
+            )
+          : options.env),
         HOME: home,
         TMPDIR: home,
         XDG_CONFIG_HOME: home,

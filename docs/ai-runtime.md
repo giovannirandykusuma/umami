@@ -8,13 +8,19 @@ it does not download anything. Provision that exact package in the deployment
 image, set an absolute `AI_PI_ROOT`, and keep it and the trusted extension read-only.
 Package provisioning/lock ownership belongs to the main integration, not this lane.
 
-Required server settings: `AI_PROVIDER`, `AI_MODEL`, `AI_PROVIDER_KEY`, and
-comma-separated HTTPS origins in `AI_EGRESS_ORIGINS`. These are never client
-parameters. The key is written to the turn's mode-0600 temporary Pi auth.json,
-not placed on the process command line. No inherited developer authentication,
+Required server settings: `AI_PROVIDER`, `AI_MODEL`, `AI_BASE_URL`,
+`AI_PROVIDER_KEY`, and `AI_EGRESS_ORIGINS` equal to the single HTTPS origin of
+`AI_BASE_URL` (which may include a `/v1` path). These are never client parameters.
+A fixed OpenAI-completions `models.json` is generated in mode-0600 per-turn scratch,
+using `$AI_PROVIDER_KEY` environment interpolation, text-only input, no reasoning,
+`supportsDeveloperRole: false` and `maxTokensField: max_tokens`. Arbitrary native
+config, commands, paths, headers and client fields are not accepted. The key is
+not written to disk or placed on the process command line. No inherited developer authentication,
 PATH, NODE_OPTIONS, proxy settings, resource settings, or unrelated secrets enter
 the child. Only explicit settings and isolated HOME/cwd/temp/XDG/Pi directories
-are passed. Auth and all turn files are deleted after the child is killed/reaped.
+are passed. All turn files are deleted after the child is killed/reaped.
+TLS verification remains enabled; no TLS bypass, NODE_OPTIONS, proxy, or inherited
+CA configuration is passed.
 
 ## Native protocol and tools
 
@@ -66,9 +72,33 @@ No sensitive diagnostics or model/tool payloads are logged or exposed as errors.
 
 ## Deployment boundary — NOT an OS sandbox
 
-The CLI and extension run under the same UID as their parent. Disabling model
-tools and resource discovery is not filesystem or kernel isolation. Deploy the
-AI worker in a dedicated unprivileged container with no application/developer
+The native child now starts with Node `--permission`, read access only to the
+pinned installed package's package.json, dist and installed runtime dependencies,
+the explicit trusted extension/launcher, and scratch. Writes are scratch-only.
+Canonical and lexical scratch aliases cover macOS `/var` symlinks. No child process,
+worker, addon, WASI or inspector privilege is granted. Node 22.23.4 supports these
+filesystem flags but has no network permission category; Node 26.10.0 has only
+boolean `--allow-net`, not destination restrictions. The latter is explicitly
+granted only on Node >=25. Neither runtime provides origin confinement here.
+
+Approved discovery exception: Pi 1.4.0's unconditional trust scan probes ancestor
+`.agents/skills` despite disabled discovery. Exact ancestor `.agents/skills` and
+`.pi` paths are granted, never the ancestor directory itself. Before granting,
+the host rejects any such path that already exists (including symlinks); planted
+credentials/config/extensions therefore prevent launch. Public extension-loader
+workspace fallback probes also require exact sibling agent/tui/ai dist entry files.
+
+**Deployment requirement:** Node directory read grants include descendants, not
+just `existsSync` metadata. The preflight check is not atomic with startup. A same-UID
+process can plant resources after it runs; absence must be maintained by deployment
+ownership/isolation, including the scratch ancestors. Use controlled `/tmp` in the
+container with no secret/resource mounts, not a developer HOME scratch location.
+This does not provide denial of planted files after launch. Auto-loading remains
+disabled. Same-UID interference and these discovery grant races remain residual
+risks, not a claimed security boundary. Startup smoke passes on Node22.23.4 and26.10.0.
+
+The CLI and extension run under the same UID as their parent. Node permissions
+are not kernel isolation. Deploy in a dedicated unprivileged container with no application/developer
 credential mounts, read-only installation, isolated ephemeral writable storage,
 CPU/memory/PID limits and enforced network egress. The configured origin check
 only checks selected model metadata: it is NOT a firewall, redirect guard or DNS
@@ -85,14 +115,17 @@ npx --yes pnpm@12.3.4 exec vitest run src/lib/ai/runtime.test.ts
 AI_PI_ROOT=/absolute/pinned/pi-coding-agent node scripts/ai/smoke.mjs
 ```
 
-The 28 tests cover native-shaped response/tool correlation, `agent_end` vs
+The synthetic lifecycle tests cover native-shaped response/tool correlation, `agent_end` vs
 settlement, invalid drafts using the merged validator, malformed output, byte,
 turn and concurrency limits, deadlines, abort, kill/reap, cleanup and env isolation.
 Native-shaped regressions cover denied/unknown tools without host UI, failed reads,
 malformed tool IDs/names/error flags, proposal followed by aborted settlement,
 malformed/missing abort flags, and a successful tool outcome.
-They also execute the installed native CLI smoke (the local integration test's
-installation path is explicit). The smoke has no provider key and never sends a
+Three confinement tests additionally exercise generated configuration rejection,
+preflight rejection of planted ancestor credentials/models/extensions, and
+real Node permission denials for app/repository/home reads, outside writes,
+subprocesses and workers. The suite also attempts the installed native CLI smoke
+(the local integration test's installation path is explicit). The smoke has no provider key and never sends a
 prompt. It verifies `get_state` ID/command/success, idle state, extension startup,
 exactly the four active tools and clean stderr, then kills/reaps and cleans up.
 No actual provider/model request or production analytics was tested.

@@ -1,13 +1,30 @@
 // Credential-free actual pinned CLI protocol/resource smoke. Never sends a prompt.
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { gatewayConfig, permissionArgs } from '../../src/lib/ai/rpc/confinement.mjs';
 const home = await mkdtemp(join(tmpdir(), 'pi-native-smoke-'));
+const gateway = {
+  AI_PROVIDER: 'smoke-gateway',
+  AI_MODEL: 'synthetic-model',
+  AI_BASE_URL: 'https://gateway.invalid/v1',
+  AI_EGRESS_ORIGINS: 'https://gateway.invalid',
+};
+await mkdir(join(home, 'agent'));
+await writeFile(join(home, 'agent/models.json'), JSON.stringify(gatewayConfig(gateway)), {
+  mode: 0o600,
+});
 const child = spawn(
   process.execPath,
   [
+    ...permissionArgs({
+      root: process.env.AI_PI_ROOT,
+      scratch: home,
+      bridge: resolve('scripts/ai/native.mjs'),
+      extension: resolve('scripts/ai/host-tools.mjs'),
+    }),
     resolve('scripts/ai/native.mjs'),
     '--mode',
     'rpc',
@@ -24,9 +41,9 @@ const child = spawn(
     '--extension',
     resolve('scripts/ai/host-tools.mjs'),
     '--provider',
-    'openai',
+    gateway.AI_PROVIDER,
     '--model',
-    'gpt-4o',
+    gateway.AI_MODEL,
   ],
   {
     cwd: home,
@@ -36,7 +53,7 @@ const child = spawn(
       AI_PI_ROOT: process.env.AI_PI_ROOT,
       PI_OFFLINE: '1',
       AI_NATIVE_SMOKE: '1',
-      AI_EGRESS_ORIGINS: 'https://api.openai.com',
+      ...gateway,
     },
     stdio: ['pipe', 'pipe', 'pipe'],
   },

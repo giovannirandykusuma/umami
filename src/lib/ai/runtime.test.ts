@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AI_LIMITS, runAiTurn, runIsolatedTurn, type AiEvent } from './runtime';
+import { gatewayConfig, permissionArgs } from './rpc/confinement.mjs';
 
 const bridge = resolve('src/lib/ai/rpc/fixture.mjs');
 const executeTool = vi.fn(async () => ({ ok: true }));
@@ -16,6 +17,94 @@ const turn = (mode = 'success', extra = {}, timeoutMs = 1000, env = {}) =>
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
+});
+
+describe('confinement', () => {
+  it('constructs only a fixed env-key gateway schema and rejects unknown endpoints/models', () => {
+    const env = {
+      AI_PROVIDER: 'gateway',
+      AI_MODEL: 'test-model',
+      AI_BASE_URL: 'https://gateway.invalid/v1',
+      AI_EGRESS_ORIGINS: 'https://gateway.invalid',
+    };
+    expect(gatewayConfig(env)).toEqual({
+      providers: {
+        gateway: {
+          baseUrl: env.AI_BASE_URL,
+          api: 'openai-completions',
+          apiKey: '$AI_PROVIDER_KEY',
+          authHeader: true,
+          models: [
+            {
+              id: 'test-model',
+              input: ['text'],
+              reasoning: false,
+              compat: { supportsDeveloperRole: false, maxTokensField: 'max_tokens' },
+            },
+          ],
+        },
+      },
+    });
+    for (const extra of [
+      { AI_BASE_URL: 'http://gateway.invalid/v1' },
+      { AI_BASE_URL: 'https://user:pass@gateway.invalid/v1' },
+      { AI_BASE_URL: 'https://elsewhere.invalid/v1' },
+      { AI_BASE_URL: 'https://gateway.invalid/v1?key=secret' },
+      { AI_MODEL: '!command' },
+      { AI_MODEL: '' },
+      { AI_PROVIDER: '../file' },
+      { AI_EGRESS_ORIGINS: 'https://gateway.invalid,https://elsewhere.invalid' },
+    ])
+      expect(() => gatewayConfig({ ...env, ...extra })).toThrow();
+  });
+  it('rejects planted ancestor credentials and extensions before granting discovery access', async () => {
+    const parent = await mkdtemp(join(tmpdir(), 'ai-ancestor-'));
+    const scratch = join(parent, 'scratch');
+    await mkdir(scratch);
+    try {
+      for (const resource of ['.pi', '.agents/skills']) {
+        const directory = join(parent, resource);
+        await mkdir(directory, { recursive: true });
+        await writeFile(join(directory, 'auth.json'), 'secret');
+        await writeFile(join(directory, 'models.json'), 'secret');
+        await writeFile(join(directory, 'extension.mjs'), 'throw new Error("must not load")');
+        expect(() =>
+          permissionArgs({ root: undefined, scratch, bridge, extension: bridge }),
+        ).toThrow('AI discovery probe must not exist');
+        await rm(directory, { recursive: true, force: true });
+      }
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+  it('denies secret/repository/home reads, outside writes, subprocesses and workers', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const scratch = await mkdtemp(join(tmpdir(), 'ai-permission-'));
+    try {
+      const args = permissionArgs({
+        root: undefined,
+        scratch,
+        bridge,
+        extension: resolve('scripts/ai/host-tools.mjs'),
+      });
+      const script = `
+        const assert = require('node:assert/strict');
+        const fs = require('node:fs');
+        for (const path of ${JSON.stringify([resolve('.env'), resolve('package.json'), join(process.env.HOME!, '.ssh/id_rsa')])})
+          assert.throws(() => fs.readFileSync(path), {code:'ERR_ACCESS_DENIED'});
+        assert.throws(() => fs.writeFileSync(${JSON.stringify(join(tmpdir(), 'outside-ai-write'))}, 'x'), {code:'ERR_ACCESS_DENIED'});
+        assert.throws(() => require('node:child_process').spawn(process.execPath), {code:'ERR_ACCESS_DENIED'});
+        assert.throws(() => new (require('node:worker_threads').Worker)('0', {eval:true}), {code:'ERR_ACCESS_DENIED'});
+        console.log('denials verified');`;
+      expect(
+        execFileSync(process.execPath, [...args, '-e', script], {
+          env: { NODE_ENV: 'test' },
+        }).toString(),
+      ).toContain('denials verified');
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('bounded isolated AI runtime (synthetic RPC only)', () => {

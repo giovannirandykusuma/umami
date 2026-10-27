@@ -37,6 +37,12 @@ export default function (pi) {
     } catch {
       process.exit(1);
     }
+    if (
+      ctx.model?.provider !== process.env.AI_PROVIDER ||
+      ctx.model?.id !== process.env.AI_MODEL ||
+      ctx.model?.baseUrl !== process.env.AI_BASE_URL
+    )
+      process.exit(1);
     if (!(process.env.AI_EGRESS_ORIGINS || '').split(',').includes(origin)) {
       process.exit(1);
     }
