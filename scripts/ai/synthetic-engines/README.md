@@ -9,7 +9,7 @@ sh scripts/ai/synthetic-engines/setup.sh
 AI_SYNTHETIC_ENGINES=1 npx --yes pnpm@12.3.4 exec vitest run src/lib/ai/query.engine.test.ts
 npx --yes pnpm@12.3.4 exec vitest run src/lib/ai/server.test.ts
 npx --yes pnpm@12.3.4 exec vitest run src/lib/ai
-/Users/randy/Developer/personal/shikumi/scripts/affected-tests --base HEAD
+npx --yes pnpm@12.3.4 exec vitest run --changed HEAD~1
 ```
 
 Setup is a service-lifecycle receipt, not a test. It prints STATE, PostgreSQL PID and container ID; logs, ownership markers and database files live under that unique `/tmp/umami-ai-synthetic.*` path, independent of the worktree. Ports bind only to 127.0.0.1. PostgreSQL uses a fixture-only user/database `ai_synthetic` with trust authentication on this disposable loopback service. ClickHouse uses `ai_synthetic:synthetic-only`. Never put real data here. Tests overwrite database connection variables with these exact loopback endpoints, disable replicas/Redis, verify the PostgreSQL fixture marker and create only synthetic tables. Reruns tolerate their existing fixture tables. No provider calls, production endpoints, persistence tools or real application data are used.

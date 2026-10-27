@@ -74,6 +74,28 @@ extension. MAIN explicitly authorized only test-side launch argument composition
 production runtime/native/host-tools and authorization were not changed. Do not
 add a production request field, environment switch or discovery hook for test code.
 
+## Build and isolated staging startup
+
+This repository contains staging-ready source, not a deployed staging service. AI is disabled unless `AI_ENABLED=true`. First install the exact package manager and application dependencies, generate the Prisma client, build workspace packages and build the application against a dedicated staging database:
+
+```sh
+npx --yes pnpm@12.3.4 install --frozen-lockfile
+npx --yes pnpm@12.3.4 generate:db:client
+npx --yes pnpm@12.3.4 build:packages
+npx --yes pnpm@12.3.4 build
+npx --yes pnpm@12.3.4 start
+```
+
+Use normal Umami authentication and database migrations for the isolated staging instance; sign in as a user with website access and board editing rights. Never disable authentication to enable AI. Provide the staging database URL and ordinary Umami application settings through server secret/config management. Do not point these commands at production. The full build depends on normal upstream database/environment checks and is not established by the feature tests alone.
+
+Install native Pi at image-build time in a dedicated read-only location, never during a request:
+
+```sh
+npm install --prefix /opt/umami-ai --save-exact @earendil-works/pi-coding-agent@1.4.0
+```
+
+Freeze the resulting transitive lockfile and image digest. Set `AI_PI_ROOT=/opt/umami-ai/node_modules/@earendil-works/pi-coding-agent`; application assets under `scripts/ai/` must be included in the server image. Keep AI disabled until the provider, isolation and license gates below are satisfied. No live-provider compatibility, deployed network isolation or full ship-suite pass is claimed by the offline receipts.
+
 ## Deployment requirements (not supplied by these tests)
 
 Required server settings are `AI_ENABLED`, absolute `AI_PI_ROOT`, `AI_PROVIDER`,

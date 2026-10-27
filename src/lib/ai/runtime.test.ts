@@ -146,7 +146,7 @@ describe('bounded isolated AI runtime (synthetic RPC only)', () => {
         NODE_ENV: 'test',
         AI_PI_ROOT:
           process.env.AI_PI_ROOT ||
-          '/Users/randy/.local/lib/node_modules/@earendil-works/pi-coding-agent',
+          `${process.env.HOME}/.local/lib/node_modules/@earendil-works/pi-coding-agent`,
       },
       timeout: 20000,
     }).toString();
