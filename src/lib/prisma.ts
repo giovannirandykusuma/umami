@@ -1,4 +1,5 @@
 import { PrismaPg } from '@prisma/adapter-pg';
+import { aiReads, getAiQueryScope, type AiQueryScope } from './ai/query';
 import { readReplicas } from '@prisma/extension-read-replicas';
 import debug from 'debug';
 import { PrismaClient } from '@/generated/prisma/client';
@@ -716,7 +717,7 @@ async function executeRawQuery(
   name?: string,
   write = false,
 ): Promise<any> {
-  if (process.env.LOG_QUERY) {
+  if (process.env.LOG_QUERY && !aiReads.getStore()) {
     log('QUERY:\n', sql);
     log('PARAMETERS:\n', data);
     log('NAME:\n', name);
@@ -734,13 +735,18 @@ async function executeRawQuery(
     return `$${params.length}${type ?? ''}`;
   });
 
-  const queryClient = getRawQueryClient(client, {
-    useReplica: !!process.env.DATABASE_REPLICA_URL,
-    write,
-  });
+  if (aiReads.getStore() && write) throw new Error('AI reads cannot write.');
+  const queryClient =
+    getAiQueryScope()?.tx ??
+    getRawQueryClient(client, {
+      useReplica: !!process.env.DATABASE_REPLICA_URL,
+      write,
+    });
 
   if (schema) {
-    await queryClient.$executeRawUnsafe(`SET search_path TO "${schema}";`);
+    await queryClient.$executeRawUnsafe(
+      `${aiReads.getStore() ? 'SET LOCAL' : 'SET'} search_path TO "${schema}";`,
+    );
   }
 
   return queryClient.$queryRawUnsafe(query, ...params);
@@ -758,7 +764,8 @@ async function pagedQuery<T>(model: string, criteria: T, filters?: QueryFilters)
   const { page = 1, pageSize, orderBy, sortDescending = false, search } = filters || {};
   const size = +pageSize || DEFAULT_PAGE_SIZE;
 
-  const data = await client[model].findMany({
+  const queryClient = getAiQueryScope()?.tx ?? client;
+  const data = await queryClient[model].findMany({
     ...criteria,
     ...{
       ...(size > 0 && { take: +size, skip: +size * (+page - 1) }),
@@ -772,7 +779,7 @@ async function pagedQuery<T>(model: string, criteria: T, filters?: QueryFilters)
     },
   });
 
-  const count = await client[model].count({ where: (criteria as any).where });
+  const count = await queryClient[model].count({ where: (criteria as any).where });
 
   return { data, count, page: +page, pageSize: size, orderBy, search };
 }
@@ -841,6 +848,7 @@ function getSearchParameters(query: string, filters: Record<string, any>[]) {
 }
 
 function transaction(input: any, options?: any) {
+  if (aiReads.getStore()) throw new Error('Nested AI transactions are not allowed.');
   return client.$transaction(input, options);
 }
 
@@ -911,8 +919,65 @@ function getClient() {
 
 const client = (globalThis[PRISMA] || getClient()) as ReturnType<typeof getClient>;
 
+let aiClient: PrismaClient | undefined;
+function getAiClient() {
+  // Separate bounded pool: pg acquisition/connect timeout also covers a stalled
+  // driver connect underneath Prisma's maxWait. No ordinary pool settings change.
+  aiClient ??= new PrismaClient({
+    adapter: new PrismaPg(
+      {
+        connectionString: process.env.DATABASE_URL,
+        max: 4,
+        connectionTimeoutMillis: 1000,
+        statement_timeout: 1000,
+      },
+      { schema: getSchema() },
+    ),
+  });
+  return aiClient;
+}
+
+/** Opt-in only: ordinary callers retain their original client and replica dispatch. */
+export async function withAiPrismaRead<T>(work: () => Promise<T>, scope: AiQueryScope): Promise<T> {
+  if (aiReads.getStore()) throw new Error('Nested AI scopes are not allowed.');
+  scope.signal.throwIfAborted();
+  return getAiClient().$transaction(
+    async tx => {
+      // SET LOCAL is reverted by commit/rollback, including statement-timeout failure.
+      await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
+      await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '1000ms'");
+      const state = { ...scope, tx, closed: false };
+      let stop!: () => void;
+      let timer: ReturnType<typeof setTimeout>;
+      const stopped = new Promise<never>((_, reject) => {
+        stop = () => {
+          state.closed = true;
+          reject(new Error('AI read stopped.'));
+        };
+        scope.signal.addEventListener('abort', stop, { once: true });
+        timer = setTimeout(stop, Math.max(0, scope.deadline - Date.now()));
+      });
+      try {
+        return await aiReads.run(state, async () => {
+          getAiQueryScope();
+          const result = await Promise.race([Promise.resolve().then(work), stopped]);
+          getAiQueryScope();
+          return result;
+        });
+      } finally {
+        state.closed = true;
+        clearTimeout(timer!);
+        scope.signal.removeEventListener('abort', stop);
+      }
+    },
+    { maxWait: 1000, timeout: 10_000 },
+  );
+}
+
 export default {
-  client,
+  get client() {
+    return (getAiQueryScope()?.tx ?? client) as typeof client;
+  },
   transaction,
   getAddIntervalQuery,
   getCastColumnQuery,

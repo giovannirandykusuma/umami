@@ -2,6 +2,7 @@ import { type ClickHouseClient, createClient } from '@clickhouse/client';
 import { formatInTimeZone } from 'date-fns-tz';
 import debug from 'debug';
 import { CLICKHOUSE } from '@/lib/db';
+import { getAiQueryScope } from '@/lib/ai/query';
 import { DATA_TYPE, DEFAULT_PAGE_SIZE, FILTER_COLUMNS, OPERATORS } from './constants';
 import { filtersObjectToArray } from './params';
 import type { Operator, PropertyFilter, QueryFilters, QueryOptions } from './types';
@@ -712,23 +713,39 @@ async function rawQuery<T = unknown>(
   params: Record<string, unknown> = {},
   name?: string,
 ): Promise<T> {
-  if (process.env.LOG_QUERY) {
+  const scope = getAiQueryScope();
+  if (process.env.LOG_QUERY && !scope) {
     log({ query, params, name });
   }
 
   await connect();
 
   const resultSet = await clickhouse.query({
+    ...(scope && { abort_signal: scope.signal }),
     query: query,
     query_params: params,
     format: 'JSONEachRow',
     clickhouse_settings: {
+      ...(scope && {
+        max_execution_time: 1,
+        wait_end_of_query: 1,
+        timeout_overflow_mode: 'throw' as const,
+      }),
       date_time_output_format: 'iso',
       output_format_json_quote_64bit_integers: 0,
     },
   });
 
-  return (await resultSet.json()) as T;
+  const data = await resultSet.json();
+  // ClickHouse can encode a late streaming failure as a JSONEachRow exception
+  // after its HTTP buffer fills, even with wait_end_of_query enabled.
+  if (
+    scope &&
+    Array.isArray(data) &&
+    data.some(row => row && typeof row === 'object' && 'exception' in row)
+  )
+    throw new Error('AI analytics query failed.');
+  return data as T;
 }
 
 async function insert(table: string, values: any[]) {
