@@ -228,6 +228,7 @@ export default withNextIntl({
     ignoreBuildErrors: true,
   },
   experimental: {
+    ...(process.env.BUILD_WORKERS ? { cpus: Number(process.env.BUILD_WORKERS) } : {}),
     useTypeScriptCli: true,
   },
   async headers() {

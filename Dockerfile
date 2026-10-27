@@ -34,6 +34,8 @@ COPY . .
 COPY docker/proxy.ts ./src
 
 ARG BASE_PATH
+ARG BUILD_WORKERS=2
+ENV BUILD_WORKERS=$BUILD_WORKERS
 
 ENV BASE_PATH=$BASE_PATH
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -65,6 +67,11 @@ RUN set -x \
     && apk add --no-cache curl libc6-compat \
     && npm install -g pnpm@${PNPM_VERSION} \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
+# Pinned native RPC runtime; no request-time downloads or inherited host install.
+RUN mkdir -p /opt/umami-ai \
+    && pnpm add --dir /opt/umami-ai --ignore-scripts --save-exact @earendil-works/pi-coding-agent@1.4.0
+ENV AI_PI_ROOT=/opt/umami-ai/node_modules/@earendil-works/pi-coding-agent
 
 RUN echo {} > package.json
 
