@@ -11,6 +11,22 @@ const RECORDER_SCRIPT = '/recorder.js';
 const isProd = process.env.NODE_ENV === 'production';
 const isVercel = Boolean(process.env.VERCEL);
 
+export function validateSourceUrl(url: string | undefined, production = isProd) {
+  if (!url && !production) return;
+  if (
+    !url ||
+    !/^https:\/\/github\.com\/giovannirandykusuma\/umami\/tree\/(?:[a-f0-9]{40}|source-release-[A-Za-z0-9][A-Za-z0-9._-]*)$/.test(
+      url,
+    )
+  ) {
+    throw new Error(
+      'NEXT_PUBLIC_SOURCE_URL must identify the exact public 40-hex commit or reviewed source-release-* tag before building production.',
+    );
+  }
+}
+
+validateSourceUrl(process.env.NEXT_PUBLIC_SOURCE_URL);
+
 const apiUrl = process.env.API_URL || '';
 const basePath = process.env.BASE_PATH || '';
 const cloudMode = process.env.CLOUD_MODE || '';
@@ -212,6 +228,7 @@ export default withNextIntl({
     position: 'bottom-right',
   },
   env: {
+    NEXT_PUBLIC_SOURCE_URL: process.env.NEXT_PUBLIC_SOURCE_URL || '',
     apiUrl,
     basePath,
     cloudMode,

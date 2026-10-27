@@ -1,5 +1,6 @@
 'use client';
 import { Icon, Row } from '@umami/react-zen';
+import { SourceCodeLink } from '@/components/common/SourceCodeLink';
 import { useNavigation } from '@/components/hooks';
 import { Minus } from '@/components/icons';
 import { BoardSelect } from '@/components/input/BoardSelect';
@@ -47,6 +48,7 @@ export function TopNav() {
       width="100%"
       zIndex={100}
       backgroundColor="surface-raised"
+      style={{ flexWrap: 'wrap' }}
     >
       <Row alignItems="center">
         <TeamsButton />
@@ -104,6 +106,9 @@ export function TopNav() {
           </>
         )}
       </Row>
+      <div style={{ marginLeft: 'auto' }}>
+        <SourceCodeLink />
+      </div>
       <div
         style={{
           position: 'absolute',
