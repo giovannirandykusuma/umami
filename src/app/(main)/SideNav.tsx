@@ -18,6 +18,7 @@ import styles from '@/components/common/OverlayScrollArea.module.css';
 import { useGlobalState, useMessages, useNavigation } from '@/components/hooks';
 import {
   Globe,
+  Sparkles,
   Grid2x2,
   LayoutDashboard,
   LinkIcon,
@@ -33,6 +34,7 @@ export function SideNav(props: any) {
   const [isCollapsed] = useGlobalState('sidenav-collapsed', false);
 
   const links = [
+    { id: 'assistant', label: 'Assistant', path: '/assistant', icon: <Sparkles /> },
     ...(!teamId
       ? [
           {
