@@ -14,3 +14,10 @@
 ## 2026-10-28 — Never clean up a rejected lane before its diff is safely exported
 
 - Ran patch export and shikumi_lane_cleanup(force) in the same parallel batch; export failed (shots ignored by git add) and cleanup deleted the only copy of uncommitted worker output. Recovered from the Pi session log by replaying edits — lossy. Rule: export, verify file size, THEN cleanup, sequentially; or commit in the worktree first.
+
+## 2026-10-28 — Merge gate friction (assistant-ui-r2)
+
+- VERDICT_DIRS is colon-separated; a code+ui judge pair cannot both be bound (activeReview is single), so MAIN rebinds activeReview by hand.
+- A failed gate after the lane-side commit leaves the worktree committed; retry fails with empty scope until MAIN soft-resets it.
+- New lane deps are not installed in MAIN node_modules before the merged-tree tests: install from the lane lockfile first.
+- Full affected run under machine load ~22 times out child-process tests; use VITEST_MAX_WORKERS=4.
