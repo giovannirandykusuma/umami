@@ -72,6 +72,31 @@ describe('assistant host tools', () => {
       executeTool('umami_api', { method: 'GET', path: '/api/auth/login' }, input),
     ).rejects.toThrow('API path or method denied');
   });
+  it('preserves an explicit comparison range through show_chart', async () => {
+    const events: any[] = [];
+    const component = {
+      type: 'WebsiteCompareChart',
+      props: {
+        websiteIds: ['a', 'b'],
+        metric: 'visitors',
+        unit: 'day',
+        startAt: Date.parse('2026-01-01T00:00:00Z'),
+        endAt: Date.parse('2026-01-14T23:59:59Z'),
+      },
+    };
+    await executeTool(
+      'show_chart',
+      { title: 'Last 14 days', component },
+      {
+        credentials: new Headers(),
+        interaction: new Interaction(part => events.push(part), new AbortController().signal),
+      },
+    );
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'chart', title: 'Last 14 days', component }),
+    ]);
+  });
+
   it('bounds API output and forbids redirects', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('x'.repeat(100000)));
     const result = await executeTool(

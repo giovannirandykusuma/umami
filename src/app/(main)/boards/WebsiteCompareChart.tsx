@@ -18,6 +18,8 @@ export interface WebsiteCompareChartProps {
   websiteIds: string[];
   metric: 'visitors' | 'pageviews';
   unit?: 'hour' | 'day' | 'month';
+  startAt?: number;
+  endAt?: number;
 }
 
 const palette = [
@@ -37,11 +39,21 @@ export function WebsiteCompareChart({
   websiteIds = [],
   metric,
   unit: requestedUnit,
+  startAt,
+  endAt,
 }: WebsiteCompareChartProps) {
   const { get } = useApi();
-  const { timezone } = useTimezone();
+  const { timezone, fromUtc } = useTimezone();
   const { dateRange } = useDateRange({ timezone });
-  const { startDate, endDate } = dateRange;
+  // Inline assistant charts may pin a range; boards without one follow global selection.
+  const hasRange =
+    Number.isFinite(startAt) &&
+    Number.isFinite(endAt) &&
+    Math.abs(startAt) <= 8.64e15 &&
+    Math.abs(endAt) <= 8.64e15 &&
+    startAt <= endAt;
+  const startDate = hasRange ? fromUtc(startAt) : dateRange.startDate;
+  const endDate = hasRange ? fromUtc(endAt) : dateRange.endDate;
   const parameters = useDateParameters();
   const filters = useFilterParameters();
   const { locale, dateLocale } = useLocale();
@@ -50,7 +62,12 @@ export function WebsiteCompareChart({
     websiteIds.length >= 2 &&
     websiteIds.length <= 10 &&
     new Set(websiteIds).size === websiteIds.length;
-  const params = { ...parameters, ...filters, unit };
+  const params = {
+    ...parameters,
+    ...filters,
+    ...(hasRange ? { startAt, endAt } : {}),
+    unit,
+  };
   const results = useQueries({
     queries: (valid ? websiteIds : []).map(websiteId => ({
       queryKey: ['website-compare', { websiteId, ...params }],

@@ -1,4 +1,5 @@
 import { render, screen, cleanup } from '@testing-library/react';
+import { toZonedTime } from 'date-fns-tz';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebsiteCompareChart } from './WebsiteCompareChart';
 
@@ -7,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   queries: vi.fn(),
   chart: vi.fn(),
   get: vi.fn(),
+  timezone: 'UTC',
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueries: (options: any) => {
@@ -16,7 +18,10 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 vi.mock('@/components/hooks', () => ({
   useApi: () => ({ get: mocks.get }),
-  useTimezone: () => ({ timezone: 'UTC' }),
+  useTimezone: () => ({
+    timezone: mocks.timezone,
+    fromUtc: (date: number) => toZonedTime(date, mocks.timezone),
+  }),
   useDateRange: () => ({
     dateRange: { startDate: new Date('2026-01-01'), endDate: new Date('2026-01-02') },
   }),
@@ -45,6 +50,7 @@ vi.mock('@/components/common/LoadingPanel', () => ({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  mocks.timezone = 'UTC';
 });
 
 const websiteIds = ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'];
@@ -88,6 +94,48 @@ describe('WebsiteCompareChart', () => {
         url: '/test',
       });
     }
+  });
+
+  it.each(['UTC', 'America/New_York'])('pins requests and axis to explicit dates in %s', async timezone => {
+    mocks.timezone = timezone;
+    mocks.results = [result('First', 3), result('Second', 5)];
+    const startAt = Date.parse('2026-01-01T05:00:00Z');
+    const endAt = Date.parse('2026-01-14T05:00:00Z');
+    render(
+      <WebsiteCompareChart
+        websiteIds={websiteIds}
+        metric="visitors"
+        unit="day"
+        startAt={startAt}
+        endAt={endAt}
+      />,
+    );
+    const queries = mocks.queries.mock.lastCall![0].queries;
+    await Promise.all(queries.map((query: any) => query.queryFn()));
+    for (const id of websiteIds) {
+      expect(mocks.get).toHaveBeenCalledWith(`/websites/${id}/pageviews`,
+        expect.objectContaining({ startAt, endAt, unit: 'day' }));
+    }
+    expect(queries[0].queryKey[1]).toEqual(expect.objectContaining({ startAt, endAt }));
+    const props = mocks.chart.mock.lastCall![0];
+    expect(props.minDate).toEqual(toZonedTime(startAt, timezone));
+    expect(props.maxDate).toEqual(toZonedTime(endAt, timezone));
+    expect(props.chartData.datasets[0].data).toHaveLength(14);
+  });
+
+  it.each([
+    { startAt: 1 },
+    { startAt: 2, endAt: 1 },
+    { startAt: Number.NaN, endAt: 2 },
+  ])('keeps global board dates for an incomplete or invalid range: %j', range => {
+    mocks.results = [result('First', 3), result('Second', 5)];
+    render(<WebsiteCompareChart websiteIds={websiteIds} metric="visitors" {...range} />);
+    const props = mocks.chart.mock.lastCall![0];
+    expect(props.minDate).toEqual(new Date('2026-01-01'));
+    expect(props.maxDate).toEqual(new Date('2026-01-02'));
+    expect(mocks.queries.mock.lastCall![0].queries[0].queryKey[1]).toEqual(
+      expect.objectContaining({ startAt: 1, endAt: 2 }),
+    );
   });
 
   it.each([
