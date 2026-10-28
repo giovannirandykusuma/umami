@@ -43,3 +43,7 @@ Worker paused: no multi-website ConfigField in manual editor. MAIN approved wide
 ## [2026-10-28] 20261028-1700/assistant-backend | Global assistant backend merged
 
 Merged 2e2d1a2b8 after fresh judge ACCEPT (10 commands reproduced) and canonical squash gate (affected 35 tests). Per-user AiChat/AiChatMessage (additive migration 27_add_ai_assistant), SSE turns via native confined Pi with per-chat session restore, host loopback umami_api as requesting user, /api/auth and /api/ai blocked, delete confirm, ask_user, show_chart, open_link. MAIN added thin route re-exports; tsc baseline 4. Offline only: no live provider/DB yet. In-memory turn registry assumes single process.
+
+## [2026-10-28] 20261028-1700/compare-chart | Compare chart merged
+
+Merged 4a97073f9 after fresh judge ACCEPT (r2, 6 commands; r1 unjudged: Node 26 localStorage env + invalid kind). Canonical squash gate: affected 687 passed/18 skipped. WebsiteCompareChart {websiteIds 2-10, metric visitors|pageviews (visits dropped: no series endpoint), unit}; strict draft validation; getBoardEntityIds counts all websiteIds; manual multi-website editor field. Merge-gate owns check required MAIN adding *main* glob equivalents to pack (route-group bug; original kept as pack.md.pre-glob-fix). Post-merge formatter drift on registry restored.
