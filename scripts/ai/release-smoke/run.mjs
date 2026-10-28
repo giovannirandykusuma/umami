@@ -7,7 +7,10 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const image = 'sha256:45255af191b2be5988728fb0da8588153d9c49209697ac5c83a64af2ce8dca9f';
+const image =
+  process.env.RELEASE_SMOKE_IMAGE ||
+  'sha256:45255af191b2be5988728fb0da8588153d9c49209697ac5c83a64af2ce8dca9f';
+assert.match(image, /^sha256:[0-9a-f]{64}$/);
 const prefix = `release-smoke-${randomBytes(5).toString('hex')}`;
 const network = `${prefix}-net`, db = `${prefix}-db`, app = `${prefix}-app`;
 const temp = mkdtempSync(join(tmpdir(), 'release-smoke-'));
@@ -104,23 +107,70 @@ try {
       }
     })();
     try {
-      const results = await Promise.allSettled(Array.from({ length: count }, async (_, index) => {
-        const i = count === 1 ? 0 : index + 1;
-        const proposed = { websiteId: websites[i], rows: [{ id: 'proposal-row', columns: [{ id: 'proposal-col', component: { type: 'TextBlock', props: { text: 'Invented release proposal' } } }] }] };
-        const prompt = `Create a revised board draft for this invented synthetic website. No analytics reads are needed. The website ID must remain ${websites[i]}. Replace the original text with exactly Invented release proposal. Use row id proposal-row and column id proposal-col, component type TextBlock and props text. Return this change through propose_board, not prose. IMPORTANT: propose_board must receive TWO top-level arguments: message (a short string) AND draft (the complete board JSON object). The draft field is mandatory for this requested edit; do not omit it or put the JSON inside message. Required draft object: ${JSON.stringify(proposed)}. Call propose_board once with message and draft, then finish.`;
-        const response = await fetch(`${origin}/api/ai/boards/chat`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token(users[i])}` },
-          body: JSON.stringify({ boardId: boards[i], messages: [{ role: 'user', content: prompt }] }), signal: AbortSignal.timeout(150000),
-        });
-        phase.httpStatuses.push(response.status);
-        const body = await response.json();
-        if (!response.ok) throw new Error(`live-http-${response.status}`);
-        if (!body.draft) throw new Error('live-message-without-draft');
-        assert.deepEqual(Object.keys(body).sort(), ['draft', 'message']);
-        assert.equal(typeof body.message, 'string');
-        assert.deepEqual(body.draft, proposed);
-        phase.validDrafts++;
-      }));
+      const results = await Promise.allSettled(
+        Array.from({ length: count }, async (_, index) => {
+          const i = count === 1 ? 0 : index + 1;
+          const proposed = { websiteId: websites[i], rows: [{ id: 'proposal-row', columns: [{ id: 'proposal-col', component: { type: 'TextBlock', props: { text: 'Invented release proposal' } } }] }] };
+          const scriptedPrompt = `Create a revised board draft for this invented synthetic website. No analytics reads are needed. The website ID must remain ${websites[i]}. Replace the original text with exactly Invented release proposal. Use row id proposal-row and column id proposal-col, component type TextBlock and props text. Return this change through propose_board, not prose. IMPORTANT: propose_board must receive TWO top-level arguments: message (a short string) AND draft (the complete board JSON object). The draft field is mandatory for this requested edit; do not omit it or put the JSON inside message. Required draft object: ${JSON.stringify(proposed)}. Call propose_board once with message and draft, then finish.`;
+          const scenario = process.env.RELEASE_SMOKE_SCENARIO || 'scripted';
+          assert.ok(['scripted', 'ordinary', 'unsupported', 'no-selection'].includes(scenario));
+          const prompt = ['ordinary', 'no-selection'].includes(scenario)
+            ? 'Create a dashboard showing visits and popular pages for my website'
+            : scenario === 'unsupported'
+              ? 'I want you to create like the number of usernames of the umami app and thne show or plot like a dashboard showing how many times they have logged in'
+              : scriptedPrompt;
+          const response = await fetch(`${origin}/api/ai/boards/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token(users[i])}` },
+            body: JSON.stringify({
+              ...(scenario === 'no-selection' ? {} : { boardId: boards[i] }),
+              messages: [{ role: 'user', content: prompt }],
+            }),
+            signal: AbortSignal.timeout(150000),
+          });
+          phase.httpStatuses.push(response.status);
+          const body = await response.json();
+          if (!response.ok) throw new Error(`live-http-${response.status}`);
+          if (['unsupported', 'no-selection'].includes(scenario)) {
+            assert.deepEqual(Object.keys(body), ['message']);
+            assert.equal(typeof body.message, 'string');
+            assert.ok(body.message.length > 0);
+            if (scenario === 'unsupported') {
+              phase.unsupportedChecks = {
+                mentionsRequestedCapability: /login|username|user.name|sign.in/i.test(body.message),
+                explainsLimit:
+                  /cannot|can['’]t|not|unable|only|don['’]t|limit|unsupported|missing|need|require/i.test(
+                    body.message,
+                  ),
+              };
+              assert.ok(phase.unsupportedChecks.mentionsRequestedCapability);
+              assert.ok(phase.unsupportedChecks.explainsLimit);
+            } else assert.match(body.message, /select|choose|which website/i);
+            phase.helpfulMessages = (phase.helpfulMessages || 0) + 1;
+            return true;
+          }
+          if (!body.draft) throw new Error('live-message-without-draft');
+          assert.deepEqual(Object.keys(body).sort(), ['draft', 'message']);
+          assert.equal(typeof body.message, 'string');
+          if (scenario === 'scripted') assert.deepEqual(body.draft, proposed);
+          else {
+            assert.equal(body.draft.websiteId, websites[i]);
+            const widgets = body.draft.rows.flatMap(row => row.columns.map(col => col.component));
+            assert.ok(
+              widgets.some(
+                widget => widget.type === 'WebsiteMetricsBar' || widget.type === 'WebsiteChart',
+              ),
+            );
+            assert.ok(
+              widgets.some(
+                widget => widget.type === 'MetricsTable' && widget.props?.type === 'path',
+              ),
+            );
+          }
+          phase.validDrafts++;
+          return true;
+        }),
+      );
       phase.failureCategories = results.filter(result => result.status === 'rejected').map(result => {
         const message = String(result.reason?.message);
         return /^(live-http-\d{3}|live-message-without-draft)$/.test(message) ? message : 'response-assertion-or-transport';
@@ -129,7 +179,11 @@ try {
     assert.equal(snapshot(), before, 'persistence-changed');
     phase.persistenceUnchanged = true;
   }
-  evidence.status = evidence.phases.every(phase => phase.validDrafts === phase.turns) ? 'passed' : 'failed';
+  evidence.status = evidence.phases.every(
+    phase => phase.validDrafts + (phase.helpfulMessages || 0) === phase.turns,
+  )
+    ? 'passed'
+    : 'failed';
 } catch (error) {
   // Only fixed categories or numeric HTTP statuses, never exception text from a provider/child.
   evidence.status = 'failed';

@@ -158,7 +158,10 @@ export async function handleAiChat(
         fail(403, 'Board entity access denied.');
       for (const id of ids.websiteIds) await website(id);
     };
+    let currentDraft: BoardParameters | undefined;
+    const selectedWebsites = new Set<string>();
     const authorize = async (candidate?: BoardParameters) => {
+      selectedWebsites.clear();
       let type = 'mixed';
       if (input.boardId) {
         const board = await getBoard(input.boardId);
@@ -169,6 +172,14 @@ export async function handleAiChat(
           fail(400, 'AI supports website boards only.');
         const current = (board.parameters ?? {}) as BoardParameters;
         await references(type, current);
+        for (const id of getBoardEntityIds({ type, parameters: current }).websiteIds)
+          selectedWebsites.add(id);
+        // Only the strict AI-safe subset may leave the host; legacy widgets stay private.
+        try {
+          currentDraft = validateBoardDraft(current);
+        } catch {
+          currentDraft = undefined;
+        }
         if (type === 'website' && candidate) {
           if (!current.websiteId || candidate.websiteId !== current.websiteId)
             fail(400, 'Keep the website board selection unchanged.');
@@ -177,7 +188,11 @@ export async function handleAiChat(
             fail(400, 'Website boards must use one website.');
         }
       }
-      if (candidate) await references(type, candidate);
+      if (candidate) {
+        await references(type, candidate);
+        for (const id of getBoardEntityIds({ type, parameters: candidate }).websiteIds)
+          selectedWebsites.add(id);
+      }
     };
     await bounded(() => withAiRead(() => authorize(draft), signal), signal);
     let calls = 0;
@@ -248,9 +263,24 @@ export async function handleAiChat(
         throw error;
       }
     };
+    // Reauthorize immediately before provider egress, including every selected reference.
+    await bounded(() => withAiRead(() => authorize(draft), signal), signal);
+    const endAt = Date.now();
+    const context = {
+      websiteIds: [...selectedWebsites],
+      now: endAt,
+      startAt: Math.max(0, endAt - 30 * 86_400_000),
+      endAt,
+    };
     const result = await bounded(
       () =>
-        runtime({ messages: input.messages, draft, signal, executeTool }).finally(() => {
+        runtime({
+          messages: input.messages,
+          draft: draft ?? currentDraft,
+          context,
+          signal,
+          executeTool,
+        }).finally(() => {
           acceptingTools = false;
         }),
       signal,

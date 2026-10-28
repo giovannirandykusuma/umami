@@ -117,6 +117,71 @@ the trusted CLI. Provider payloads can contain authorized analytics and history;
 provider privacy/retention policy must be approved before enabling AI. Per-process
 concurrency is not a distributed admission limit.
 
+## Synthetic natural-language release probes
+
+`scripts/ai/release-smoke/run.mjs` defaults to the original exact-JSON TextBlock
+probe. Set `RELEASE_SMOKE_SCENARIO=ordinary` for “Create a dashboard showing visits
+and popular pages for my website”, or `unsupported` for the reported request for
+usernames and login counts. Use `RELEASE_SMOKE_SINGLE_PROBE=1` to bound each
+hypothesis to one turn. The ordinary probe requires a visits widget and a path
+MetricsTable; the unsupported probe requires a nonempty message without a draft.
+These assertions do not prove the semantic quality of the explanation; review
+that separately with invented fixtures. The runner uses only disposable synthetic
+Postgres fixtures, authenticated non-admin ownership, a loopback app port, and
+checks unchanged boards/reports. Provider credentials enter through environment,
+not argv. Do not point this harness at a production database.
+
+`RELEASE_SMOKE_DIAGNOSTIC=1` mounts a test-only native-spawn observer. It emits
+fixed categories for missing/invalid website UUIDs, noninteger dates, unknown
+argument keys, invalid breakdown dimensions/limits, and native lifecycle errors;
+it never prints argument values, unknown keys, prompts, identities or provider
+error text. This is not production logging.
+
+On image `45255af191b2be5988728fb0da8588153d9c49209697ac5c83a64af2ce8dca9f`,
+Node 22.23.4 / Pi 1.4.0, the ordinary probe reproduced HTTP 502 twice and the
+unsupported probe reproduced HTTP 502 once using `cx/gpt-6.1-sol`, medium.
+The categorized ordinary and unsupported runs each attempted `analytics_summary`
+with invalid website and date arguments before termination; stderr was empty.
+Unauthenticated requests returned 401 and boards/reports remained unchanged.
+The baseline model-facing tools accepted arbitrary records without explaining
+strict host arguments. BoardId-only requests also omitted authorized current
+board parameters from the runtime. The source fix now publishes strict argument
+and supported-widget schemas, reauthorizes selected references immediately before
+egress, and supplies selected website IDs plus server-derived current time and
+30-day millisecond bounds. Only a draft accepted by `validateBoardDraft` is sent;
+legacy unsupported widgets are omitted rather than serialized to the provider.
+No-selection guidance asks for a website instead of inventing one. Unsupported
+username/login requests are instructed to return a useful message-only proposal,
+not substitute traffic reads or invent widgets. Host validation remains strict.
+
+Offline server/runtime tests cover boardId-only context, no-selection context,
+pre-egress revoked permission denial, date bounds, strict model-facing arguments,
+a valid visits/popular-pages widget proposal, and rejected unsupported metrics
+and widgets. MAIN's synthetic-only source-bound candidate
+`sha256:e3f722df5fdf9b7c11c270620fd82c9f60f369f9b8f1e1bae5ab75727507c463`
+passed post-fix native probes with the same model/reasoning/runtime: ordinary
+returned 200 with a visits widget and path MetricsTable; `no-selection` returned
+200 with a selection message; unsupported returned 200 with a message mentioning
+login/username capability and its limitation, without a draft. All native traces
+contained one proposal and zero analytics reads, no stderr, and no model errors.
+All probes retained unauthenticated 401 and unchanged synthetic boards/reports.
+The first unsupported response was message-only 200 but failed a narrow wording
+assertion; a single follow-up with boolean-only semantic categories passed.
+Its original explanation text was not retained, so the original assertion failure
+cannot be attributed to a specific phrase. No product code changed between runs.
+These probes prove supported layout generation, not analytics-read execution.
+Set `RELEASE_SMOKE_IMAGE` to an exact `sha256:` digest; tags are rejected.
+Fresh review remains required before any production rollout.
+
+Tracked username login counts are outside the three current read contracts.
+`analytics_breakdown` accepts only path/title/referrer/hostname; it cannot group a
+login event by an event property. The draft validator admits an event-name
+MetricsTable but no arbitrary event-property grouping. Fulfilling that request
+requires a separately reviewed, authorized bounded event/property aggregation
+contract and a renderer/widget contract that can display its result. The actual
+tracked event/property names and any identity-display policy must be established
+before designing that capability; this diagnosis performs no production reads.
+
 ## Offline proof
 
 ```

@@ -10,9 +10,10 @@ cp.spawn = function (command, args, options) {
   child.stdout.on('data', chunk => {
     buffer += chunk.toString('utf8');
     if (buffer.length > 2 * 1024 * 1024) { buffer = ''; count('oversize'); return; }
-    let newline;
-    while ((newline = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, newline); buffer = buffer.slice(newline + 1);
+    while (buffer.includes('\n')) {
+      const newline = buffer.indexOf('\n');
+      const line = buffer.slice(0, newline);
+      buffer = buffer.slice(newline + 1);
       try {
         const record = JSON.parse(line);
         result.records++;
@@ -53,7 +54,38 @@ cp.spawn = function (command, args, options) {
             if (request.name === 'propose_board') {
               count('proposal');
               count(request.args?.draft && typeof request.args.draft === 'object' ? 'draft-object' : 'draft-not-object');
-            } else count('read-request');
+            } else {
+              count('read-request');
+              const args = request.args || {};
+              const names = ['analytics_summary', 'analytics_breakdown', 'analytics_timeseries'];
+              count(names.includes(request.name) ? request.name : 'unknown-tool');
+              count(
+                typeof args.websiteId === 'string' && /^[0-9a-f-]{36}$/i.test(args.websiteId)
+                  ? 'website-uuid'
+                  : 'website-invalid',
+              );
+              count(
+                Number.isInteger(args.startAt) && Number.isInteger(args.endAt)
+                  ? 'dates-integer'
+                  : 'dates-invalid',
+              );
+              const allowed = [
+                'websiteId',
+                'startAt',
+                'endAt',
+                ...(request.name === 'analytics_breakdown'
+                  ? ['dimension', 'limit']
+                  : request.name === 'analytics_timeseries'
+                    ? ['metric', 'unit']
+                    : []),
+              ];
+              if (Object.keys(args).some(key => !allowed.includes(key))) count('unknown-argument');
+              if (request.name === 'analytics_breakdown') {
+                if (!['path', 'title', 'referrer', 'hostname'].includes(args.dimension))
+                  count('dimension-invalid');
+                if (![5, 10, 20].includes(args.limit)) count('limit-invalid');
+              }
+            }
           } catch { count('invalid-tool-json'); }
         }
       } catch { result.invalidJson++; }

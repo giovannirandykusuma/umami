@@ -87,6 +87,33 @@ beforeEach(() => {
 });
 
 describe('permission-safe AI board staging', () => {
+  it('passes authorized board-only context and host date bounds without trusting user text', async () => {
+    const before = Date.now();
+    const runtime = vi.fn(async (input: AiTurn) => {
+      expect(input.draft).toEqual(draft);
+      expect(input.context?.websiteIds).toEqual([site]);
+      expect(input.context?.now).toBeGreaterThanOrEqual(before);
+      expect(input.context?.endAt).toBe(input.context?.now);
+      expect(input.context!.endAt - input.context!.startAt).toBe(30 * 86_400_000);
+      return ok();
+    });
+    expect((await handleAiChat(request({ boardId, messages }), runtime)).status).toBe(200);
+    expect(runtime).toHaveBeenCalledOnce();
+  });
+  it('passes no fabricated website or draft when no selection exists', async () => {
+    const runtime = vi.fn(async (input: AiTurn) => {
+      expect(input.context?.websiteIds).toEqual([]);
+      expect(input.draft).toBeUndefined();
+      return { message: 'Select a website first.' };
+    });
+    expect((await handleAiChat(request({ messages }), runtime)).status).toBe(200);
+  });
+  it('denies revoked board references on the pre-egress authorization', async () => {
+    vi.mocked(canViewWebsite).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const runtime = vi.fn(ok);
+    expect((await handleAiChat(request({ boardId, messages }), runtime)).status).toBe(403);
+    expect(runtime).not.toHaveBeenCalled();
+  });
   it('returns useful disabled status from the real route without native calls', async () => {
     vi.stubEnv('AI_ENABLED', 'false');
     expect((await POST(request())).status).toBe(503);
@@ -252,7 +279,13 @@ describe('permission-safe AI board staging', () => {
   it('passes cancellation and exposes no persistence callbacks', async () => {
     const controller = new AbortController();
     const result = await handleAiChat(request(undefined, controller.signal), async input => {
-      expect(Object.keys(input).sort()).toEqual(['draft', 'executeTool', 'messages', 'signal']);
+      expect(Object.keys(input).sort()).toEqual([
+        'context',
+        'draft',
+        'executeTool',
+        'messages',
+        'signal',
+      ]);
       controller.abort();
       expect(input.signal.aborted).toBe(true);
       return ok();

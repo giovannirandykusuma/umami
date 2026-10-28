@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import vm from 'node:vm';
+import { validateBoardDraft } from './board-draft';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -17,6 +20,88 @@ const turn = (mode = 'success', extra = {}, timeoutMs = 1000, env = {}) =>
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
+});
+
+describe('model-facing tool contracts', () => {
+  it('publishes concrete strict arguments and supported widget schemas', () => {
+    const require = createRequire(resolve('package.json'));
+    // Native Pi resolves this same locked TypeBox version for extension imports.
+    const {
+      Type,
+    } = require('./node_modules/.pnpm/@sinclair+typebox@0.34.52/node_modules/@sinclair/typebox');
+    const {
+      Value,
+    } = require('./node_modules/.pnpm/@sinclair+typebox@0.34.52/node_modules/@sinclair/typebox/build/cjs/value/index.js');
+    const tools: Record<string, any> = {};
+    const source = readFileSync('scripts/ai/host-tools.mjs', 'utf8')
+      .replace("import { Type } from '@sinclair/typebox';", '')
+      .replace('export default function', 'function register');
+    vm.runInNewContext(source + '\nregister(pi);', {
+      Type,
+      pi: {
+        registerTool: (tool: any) => {
+          tools[tool.name] = tool;
+        },
+        on: () => {},
+      },
+    });
+    const websiteId = '11111111-1111-4111-8111-111111111111';
+    const dates = { websiteId, startAt: 0, endAt: 1000 };
+    expect(Value.Check(tools.analytics_summary.parameters, dates)).toBe(true);
+    expect(Value.Check(tools.analytics_summary.parameters, { ...dates, userId: 'forged' })).toBe(
+      false,
+    );
+    expect(Value.Check(tools.analytics_summary.parameters, {})).toBe(false);
+    expect(
+      Value.Check(tools.analytics_breakdown.parameters, {
+        ...dates,
+        dimension: 'username',
+        limit: 10,
+      }),
+    ).toBe(false);
+    expect(
+      Value.Check(tools.analytics_timeseries.parameters, {
+        ...dates,
+        metric: 'logins',
+        unit: 'day',
+      }),
+    ).toBe(false);
+    const draft = {
+      websiteId,
+      rows: [
+        {
+          id: 'row',
+          columns: [
+            { id: 'visits', component: { type: 'WebsiteMetricsBar' } },
+            {
+              id: 'pages',
+              component: { type: 'MetricsTable', props: { type: 'path', limit: 10 } },
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      Value.Check(tools.propose_board.parameters, { message: 'Visits and popular pages', draft }),
+    ).toBe(true);
+    expect(validateBoardDraft(draft)).toEqual(draft);
+    expect(Value.Check(tools.propose_board.parameters, { message: 'Not supported' })).toBe(true);
+    expect(
+      Value.Check(tools.propose_board.parameters, {
+        message: 'x',
+        draft: { ...draft, script: 'no' },
+      }),
+    ).toBe(false);
+    expect(
+      Value.Check(tools.propose_board.parameters, {
+        message: 'x',
+        draft: {
+          websiteId,
+          rows: [{ id: 'r', columns: [{ id: 'c', component: { type: 'LoginChart' } }] }],
+        },
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('confinement', () => {
