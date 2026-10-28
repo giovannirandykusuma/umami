@@ -526,6 +526,7 @@ describe('bounded isolated AI runtime (synthetic RPC only)', () => {
     const output = execFileSync(process.execPath, ['scripts/ai/smoke.mjs'], {
       env: {
         NODE_ENV: 'test',
+        TMPDIR: tmpdir(),
         AI_PI_ROOT:
           process.env.AI_PI_ROOT ||
           `${process.env.HOME}/.local/lib/node_modules/@earendil-works/pi-coding-agent`,

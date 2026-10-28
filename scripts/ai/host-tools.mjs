@@ -2,7 +2,12 @@ import { Type } from '@sinclair/typebox';
 
 // Trusted extension. This is a native RPC extension-UI exchange, not an SDK transport.
 export default function (pi) {
-  const reads = ['analytics_summary', 'analytics_breakdown', 'analytics_timeseries', 'analytics_discover'];
+  const reads = [
+    'analytics_summary',
+    'analytics_breakdown',
+    'analytics_timeseries',
+    'analytics_discover',
+  ];
   const names = [...reads, 'propose_board'];
   const object = (properties, options = {}) =>
     Type.Object(properties, { additionalProperties: false, ...options });
@@ -121,14 +126,32 @@ export default function (pi) {
           'Helpful plain text, no markup or control characters. For unsupported requests explain the limitation without a draft.',
       }),
       draft: Type.Optional(draft),
-      questions: Type.Optional(Type.Array(object({
-        id: Type.String({ pattern: '^[a-zA-Z0-9_-]{1,64}$', description: 'Unique question ID; not constructor, prototype or __proto__.' }),
-        question: Type.String({ minLength: 1, maxLength: 500 }),
-        options: Type.Optional(Type.Array(object({
-          label: Type.String({ minLength: 1, maxLength: 120 }),
-          value: Type.String({ minLength: 1, maxLength: 120 }),
-        }), { minItems: 1, maxItems: 6, description: 'Unique labels and values. Plain text answers only, never executable actions or authorization.' })),
-      }), { minItems: 1, maxItems: 3 })),
+      questions: Type.Optional(
+        Type.Array(
+          object({
+            id: Type.String({
+              pattern: '^[a-zA-Z0-9_-]{1,64}$',
+              description: 'Unique question ID; not constructor, prototype or __proto__.',
+            }),
+            question: Type.String({ minLength: 1, maxLength: 500 }),
+            options: Type.Optional(
+              Type.Array(
+                object({
+                  label: Type.String({ minLength: 1, maxLength: 120 }),
+                  value: Type.String({ minLength: 1, maxLength: 120 }),
+                }),
+                {
+                  minItems: 1,
+                  maxItems: 6,
+                  description:
+                    'Unique labels and values. Plain text answers only, never executable actions or authorization.',
+                },
+              ),
+            ),
+          }),
+          { minItems: 1, maxItems: 3 },
+        ),
+      ),
     }),
   };
   for (const name of names) {
