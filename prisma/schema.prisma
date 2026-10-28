@@ -33,8 +33,37 @@ model User {
   twoFactorOtpUseds    TwoFactorOtpUsed[]
   twoFactorRateLimit   TwoFactorRateLimit?
   apiKeys              ApiKey[]
+  aiChats              AiChat[]
 
   @@map("user")
+}
+
+model AiChat {
+  id        String   @id() @map("chat_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String   @db.VarChar(200)
+  piSession String?  @map("pi_session") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_chat")
+}
+
+model AiChatMessage {
+  id        String   @id() @map("message_id") @db.Uuid
+  chatId    String   @map("chat_id") @db.Uuid
+  role      String   @db.VarChar(20)
+  content   Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  chat AiChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
+  @@map("ai_chat_message")
 }
 
 model ApiKey {
