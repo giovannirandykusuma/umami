@@ -67,3 +67,7 @@ Worker fix done (session cwd rebase, fake-Pi cwd enforcement + regression, bound
 ## [2026-10-28] global-assistant | Live synthetic test PASSED
 
 Image sha256:4ba40d12 (source 329890ccf, pushed). Real cx/gpt-6.1-sol medium, invented data: turn 1 built "Apps compare" board with 3-site WebsiteCompareChart (GET /api/websites, show_chart, POST /api/boards, open_link, 71 text deltas); turn 2 (follow-up in same chat, restored Pi session) GET /api/boards then DELETE emitted confirm, reply rejected (200) → tool denied, board survived; history 4 messages; 401 unauth; foreign chat 404; 260 MiB/1 GiB. Thinking text: gateway sends none (live activity row instead, per Randy).
+
+## [2026-10-28] 20261028-2005/assistant-chart-range | Verification dependency provisioning
+
+Worker blocked on absent worktree dependencies. MAIN approved an untracked worktree-local node_modules symlink to the existing main dependency tree solely for tests, without installs or mutations of shared dependencies, to be removed after verification. No product scope expansion or deployment permission. Prior missing dark-mode legend report was disproved in the live browser: all three website labels are visible below the chart (shots/live/chart-legend-check.png).
