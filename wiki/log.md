@@ -59,3 +59,7 @@ Merged e9ca20b77 after fresh code judge ACCEPT (#0002: unknown SSE skipped, same
 ## [2026-10-28] global-assistant | Live synthetic test: turn 1 pass, follow-ups broken
 
 Image sha256:c0bec0a4 (source 4f3e6fbfe pushed). Live cx/gpt-6.1-sol medium, invented data: turn 1 built "Apps compare" board with 3-site WebsiteCompareChart via GET /api/websites, show_chart, POST /api/boards, open_link; 401 unauth; foreign chat 404; 254 MiB. Turn 2 failed instantly: Pi refuses restored session whose header cwd (old mkdtemp dir) no longer exists (dist/core/session-cwd.js); offline fake child never enforced it. Gateway streams no reasoning for this model (direct probes with reasoning_effort/reasoning/include_reasoning: content only) → Randy chose live activity row instead of thinking text. Fix lane assistant-followup-fix launched. Not deployed.
+
+## [2026-10-28] 20261028-2005/assistant-followup-fix | BLOCKED → env setup granted
+
+Worker fix done (session cwd rebase, fake-Pi cwd enforcement + regression, bounded exit diagnostic, live Thinking/Working timer; 52 scoped tests pass) but tsc printed 41: fresh worktree lacked generated Prisma client/package builds. MAIN granted gitignored setup (install, prisma generate, package builds); screenshots deferred to MAIN on rebuilt image.
