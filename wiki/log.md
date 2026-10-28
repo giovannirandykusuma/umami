@@ -47,3 +47,7 @@ Merged 2e2d1a2b8 after fresh judge ACCEPT (10 commands reproduced) and canonical
 ## [2026-10-28] 20261028-1700/compare-chart | Compare chart merged
 
 Merged 4a97073f9 after fresh judge ACCEPT (r2, 6 commands; r1 unjudged: Node 26 localStorage env + invalid kind). Canonical squash gate: affected 687 passed/18 skipped. WebsiteCompareChart {websiteIds 2-10, metric visitors|pageviews (visits dropped: no series endpoint), unit}; strict draft validation; getBoardEntityIds counts all websiteIds; manual multi-website editor field. Merge-gate owns check required MAIN adding *main* glob equivalents to pack (route-group bug; original kept as pack.md.pre-glob-fix). Post-merge formatter drift on registry restored.
+
+## [2026-10-28] 20261028-1700/assistant-ui | r1 REJECT; worktree lost; reconstructed
+
+Judge #0001 REJECT (2 med): unknown SSE events abort the turn (stream.ts:35); link parts accept absolute and slash-backslash external URLs (AssistantPage.tsx:669). Visual work had passed MAIN review (3 rounds of shots). MAIN ran lane cleanup (force) in parallel with a failed patch export; the uncommitted worktree was destroyed. Reconstructed by replaying the worker Pi session writes/edits on e006b1a8a + pnpm add react-markdown remark-gfm; 3 replayed edits did not apply verbatim (worker format-on-write drift), fixed SideNav duplicate + ChartJS import by hand → branch recover/assistant-ui-r1 (853feda32), tsc baseline clean. r1 shots kept in .shikumi/assistant-ui-r1-shots. Round 2: fresh hard worker from that branch.

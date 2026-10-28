@@ -10,3 +10,7 @@
 ## 2026-10-28 — Route-group Owns
 
 - `?main?` globs pass launch-overlap parsing but completion triage does not match them against `(main)` paths, so an in-scope worker is failed "outside owns". Literal `(main)` is eaten as a note. No Owns spelling works for Next route groups; MAIN verified the diff manually and judged directly.
+
+## 2026-10-28 — Never clean up a rejected lane before its diff is safely exported
+
+- Ran patch export and shikumi_lane_cleanup(force) in the same parallel batch; export failed (shots ignored by git add) and cleanup deleted the only copy of uncommitted worker output. Recovered from the Pi session log by replaying edits — lossy. Rule: export, verify file size, THEN cleanup, sequentially; or commit in the worktree first.
