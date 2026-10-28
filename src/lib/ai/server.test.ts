@@ -2,6 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/auth', () => ({ checkAuth: vi.fn() }));
+vi.mock('@/lib/prisma', () => ({ default: {} }));
+vi.mock('@/lib/entity', () => ({ getEntity: vi.fn() }));
+vi.mock('./discovery', () => ({ discoverAnalytics: vi.fn() }));
 // Endpoint tests isolate DB plumbing; query.test.ts exercises scoped clients separately.
 const dbScope = vi.hoisted(() => ({ active: 0 }));
 vi.mock('./query', () => ({
@@ -23,7 +26,11 @@ vi.mock('@/lib/request', () => ({
 }));
 vi.mock('@/permissions/board', () => ({ canUpdateBoard: vi.fn(), canViewBoardEntities: vi.fn() }));
 vi.mock('@/permissions/website', () => ({ canViewWebsite: vi.fn() }));
-vi.mock('@/queries/prisma', () => ({ getBoard: vi.fn(), getWebsite: vi.fn() }));
+vi.mock('@/queries/prisma', () => ({
+  getBoard: vi.fn(),
+  getWebsite: vi.fn(),
+  getTeamUser: vi.fn(),
+}));
 vi.mock('@/queries/sql', () => ({
   getWebsiteStats: vi.fn(),
   getPageviewMetrics: vi.fn(),
@@ -39,10 +46,12 @@ vi.mock('./runtime', async () => ({
 import { checkAuth } from '@/lib/auth';
 import { canUpdateBoard, canViewBoardEntities } from '@/permissions/board';
 import { canViewWebsite } from '@/permissions/website';
-import { getBoard, getWebsite } from '@/queries/prisma';
+import { getBoard, getWebsite, getTeamUser } from '@/queries/prisma';
+import { getEntity } from '@/lib/entity';
 import { getPageviewMetrics, getPageviewStats, getWebsiteStats } from '@/queries/sql';
 import type { AiTurn } from './runtime';
 import { handleAiChat } from './server';
+import { discoverAnalytics } from './discovery';
 import { POST } from '@/app/api/ai/boards/chat/route';
 
 const site = '11111111-1111-4111-8111-111111111111';
@@ -64,7 +73,12 @@ function request(body: unknown = { messages, draft }, signal?: AbortSignal) {
 }
 async function tool(name = 'analytics_summary', values: Record<string, unknown> = args) {
   return handleAiChat(request(), async input => {
-    await input.executeTool(name as Parameters<AiTurn['executeTool']>[0], values);
+    await input.executeTool(
+      name as Parameters<AiTurn['executeTool']>[0],
+      name === 'analytics_discover' && values === args
+        ? { ...args, startAt: Date.now() - 1000, endAt: Date.now() - 1 }
+        : values,
+    );
     return ok();
   });
 }
@@ -87,6 +101,266 @@ beforeEach(() => {
 });
 
 describe('permission-safe AI board staging', () => {
+  it('discovers only through scoped authorization and rechecks before delivery', async () => {
+    vi.mocked(discoverAnalytics).mockImplementation(async () => {
+      expect(dbScope.active).toBeGreaterThan(0);
+      return {
+        events: [],
+        properties: [],
+        truncated: { events: false, properties: false },
+        coverage: 'unavailable',
+      };
+    });
+    expect((await tool('analytics_discover')).status).toBe(200);
+    expect(discoverAnalytics).toHaveBeenCalledOnce();
+    expect(canViewWebsite).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.anything() }),
+      site,
+    );
+  });
+  it.each([
+    ['other user', { userId: 'someone-else' }, false],
+    ['team without membership', { teamId: 'team' }, false],
+    ['team member', { teamId: 'team' }, true],
+  ])(
+    'uses real user-only website permissions for discovery: %s',
+    async (_label, entity, allowed) => {
+      const real =
+        await vi.importActual<typeof import('@/permissions/website')>('@/permissions/website');
+      vi.mocked(canViewWebsite).mockImplementation(real.canViewWebsite);
+      vi.mocked(getEntity).mockResolvedValue(entity as any);
+      vi.mocked(getTeamUser).mockResolvedValue(allowed ? ({ id: 'member' } as any) : null);
+      vi.mocked(discoverAnalytics).mockResolvedValue({ events: [], properties: [] } as any);
+      expect((await tool('analytics_discover')).status).toBe(allowed ? 200 : 403);
+      expect(discoverAnalytics).toHaveBeenCalledTimes(allowed ? 1 : 0);
+    },
+  );
+  it('denies nonexistent sites even with real administrator permission', async () => {
+    const real =
+      await vi.importActual<typeof import('@/permissions/website')>('@/permissions/website');
+    vi.mocked(canViewWebsite).mockImplementation(real.canViewWebsite);
+    vi.mocked(checkAuth).mockResolvedValue({
+      user: { id: crypto.randomUUID(), isAdmin: true },
+      authType: 'session',
+    } as any);
+    vi.mocked(getWebsite).mockResolvedValue(null);
+    expect((await tool('analytics_discover')).status).toBe(403);
+    expect(discoverAnalytics).not.toHaveBeenCalled();
+  });
+  it('denies revocation immediately after discovery', async () => {
+    vi.mocked(discoverAnalytics).mockImplementation(async () => {
+      vi.mocked(canViewWebsite).mockResolvedValue(false);
+      return { events: [], properties: [] } as any;
+    });
+    expect((await tool('analytics_discover')).status).toBe(403);
+  });
+  it('denies revocation between discovery and final delivery', async () => {
+    vi.mocked(discoverAnalytics).mockResolvedValue({ events: [], properties: [] } as any);
+    const res = await handleAiChat(request(), async input => {
+      await input.executeTool('analytics_discover', {
+        ...args,
+        startAt: Date.now() - 1000,
+        endAt: Date.now() - 1,
+      });
+      vi.mocked(canViewWebsite).mockResolvedValue(false);
+      return { message: 'Do not deliver this.' };
+    });
+    expect(res.status).toBe(403);
+    expect(await res.text()).not.toContain('Do not deliver');
+  });
+  it('rejects discovery outside the selected context and its date bounds', async () => {
+    expect((await tool('analytics_discover', { ...args })).status).toBe(400);
+    vi.mocked(checkAuth).mockResolvedValue({
+      user: { id: crypto.randomUUID() },
+      authType: 'session',
+    } as any);
+    expect(
+      (
+        await tool('analytics_discover', {
+          ...args,
+          websiteId: other,
+          startAt: Date.now() - 1000,
+          endAt: Date.now() - 1,
+        })
+      ).status,
+    ).toBe(400);
+    expect(discoverAnalytics).not.toHaveBeenCalled();
+  });
+  it('returns validated questions to JSON clients', async () => {
+    const questions = [{ id: 'login', question: 'Which event means a successful login?' }];
+    const res = await handleAiChat(request(), async () => ({
+      message: 'Please clarify.',
+      questions,
+    }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ message: 'Please clarify.', questions });
+  });
+  it('streams only fixed progress and one validated terminal result after authorization', async () => {
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    const res = await handleAiChat(req, async input => {
+      input.onEvent?.({ type: 'progress', phase: 'start' });
+      input.onEvent?.({ type: 'progress', phase: 'complete' });
+      input.onEvent?.({ type: 'result', result: { message: 'secret premature' } });
+      return {
+        message: 'Choose a login event.',
+        questions: [{ id: 'event', question: 'Which event?' }],
+      };
+    });
+    expect(res.headers.get('content-type')).toBe('text/event-stream');
+    const frames = (await res.text())
+      .trim()
+      .split('\n\n')
+      .map(frame => JSON.parse(frame.split('\ndata: ')[1]));
+    expect(frames).toEqual([
+      { type: 'progress', phase: 'start' },
+      { type: 'progress', phase: 'complete' },
+      {
+        type: 'result',
+        result: {
+          message: 'Choose a login event.',
+          questions: [{ id: 'event', question: 'Which event?' }],
+        },
+      },
+    ]);
+  });
+  it('streams a safe error for malformed questions without a result', async () => {
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    const res = await handleAiChat(req, async () => ({
+      message: 'test',
+      questions: [{ id: '__proto__', question: 'secret' }],
+    }));
+    const body = await res.text();
+    expect(body).toContain('event: error');
+    expect(body).not.toContain('event: result');
+    expect(body).not.toContain('secret');
+  });
+  it('bounds progress floods and oversized UTF-8 stream output', async () => {
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    const res = await handleAiChat(req, async input => {
+      for (let n = 0; n < 1000; n++) input.onEvent?.({ type: 'progress', phase: 'read' });
+      return { message: '😀'.repeat(40000) };
+    });
+    const body = await res.text();
+    expect(Buffer.byteLength(body)).toBeLessThan(2000);
+    expect(body).toContain('event: error');
+    expect(body).not.toContain('event: result');
+    expect(body.match(/event: progress/g)?.length ?? 0).toBeLessThanOrEqual(20);
+  });
+  it('forwards request disconnection to streaming runtime without late writes', async () => {
+    const controller = new AbortController();
+    const req = request(undefined, controller.signal);
+    req.headers.set('accept', 'text/event-stream');
+    let stopped: Promise<void>;
+    const res = await handleAiChat(req, async input => {
+      stopped = new Promise(resolve =>
+        input.signal!.addEventListener('abort', () => resolve(), { once: true }),
+      );
+      await stopped;
+      input.onEvent?.({ type: 'progress', phase: 'read' });
+      return { message: 'late' };
+    });
+    controller.abort();
+    await stopped!;
+    expect(await res.text()).toBe('');
+  });
+  it('keeps oversized streaming bodies as JSON before headers', async () => {
+    const req = request({ messages: [{ role: 'user', content: 'a'.repeat(40000) }] });
+    req.headers.set('accept', 'text/event-stream');
+    const res = await handleAiChat(req);
+    expect(res.status).toBe(413);
+    expect(res.headers.get('content-type')).toBe('application/json');
+  });
+  it('reauthorizes again after backpressure before emitting complete or result', async () => {
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    let generated = () => {};
+    const ready = new Promise<void>(resolve => {
+      generated = resolve;
+    });
+    const res = await handleAiChat(req, async input => {
+      input.onEvent?.({ type: 'progress', phase: 'start' });
+      generated();
+      return { message: 'withhold' };
+    });
+    await ready;
+    await new Promise(resolve => setImmediate(resolve));
+    vi.mocked(canViewWebsite).mockResolvedValue(false);
+    const body = await res.text();
+    expect(body).toContain('event: error');
+    expect(body).not.toContain('event: result');
+    expect(body).not.toContain('"phase":"complete"');
+    expect(body).not.toContain('withhold');
+  });
+  it('delivers exactly one safe host-deadline error, including under backpressure, and releases admission', async () => {
+    vi.mocked(checkAuth).mockImplementation(
+      async () => ({ user: { id: crypto.randomUUID() }, authType: 'session' }) as any,
+    );
+    let stopped = 0;
+    const pending = async (input: AiTurn) => {
+      await new Promise<void>(resolve =>
+        input.signal!.addEventListener(
+          'abort',
+          () => {
+            stopped++;
+            resolve();
+          },
+          { once: true },
+        ),
+      );
+      throw new Error('private runtime failure');
+    };
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    const reading = await handleAiChat(req, pending);
+    const bodyPromise = reading.text();
+    const slowReq = request();
+    slowReq.headers.set('accept', 'text/event-stream');
+    let slowDeadline: Promise<void> = Promise.resolve();
+    const slow = await handleAiChat(slowReq, async input => {
+      slowDeadline = new Promise(resolve =>
+        input.signal!.addEventListener('abort', () => resolve(), { once: true }),
+      );
+      input.onEvent?.({ type: 'progress', phase: 'start' });
+      return { message: 'Never deliver after deadline.' };
+    });
+    const body = await bodyPromise; // Real 45-second host deadline, no timer/limit mocks.
+    await slowDeadline;
+    const slowBody = await slow.text();
+    for (const text of [body, slowBody]) {
+      expect(text.match(/event: error/g)).toHaveLength(1);
+      expect(text).not.toContain('event: result');
+      expect(text).not.toContain('private');
+    }
+    expect(stopped).toBe(1);
+    await new Promise(resolve => setImmediate(resolve));
+    expect((await handleAiChat(request(), ok)).status).toBe(200);
+    expect(dbScope.active).toBe(0);
+  }, 55000);
+  it('keeps unauthenticated stream requests as JSON before headers', async () => {
+    vi.mocked(checkAuth).mockResolvedValue(null);
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    const res = await handleAiChat(req);
+    expect(res.status).toBe(401);
+    expect(res.headers.get('content-type')).toBe('application/json');
+  });
+  it('propagates stream cancellation to the runtime', async () => {
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    let stopped: Promise<void>;
+    const res = await handleAiChat(req, async input => {
+      stopped = new Promise(resolve =>
+        input.signal!.addEventListener('abort', () => resolve(), { once: true }),
+      );
+      await stopped;
+      throw new Error('cancelled');
+    });
+    await res.body!.cancel();
+    await stopped!;
+  });
   it('passes authorized board-only context and host date bounds without trusting user text', async () => {
     const before = Date.now();
     const runtime = vi.fn(async (input: AiTurn) => {
@@ -284,6 +558,7 @@ describe('permission-safe AI board staging', () => {
         'draft',
         'executeTool',
         'messages',
+        'onEvent',
         'signal',
       ]);
       controller.abort();

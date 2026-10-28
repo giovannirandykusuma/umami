@@ -9,6 +9,13 @@ import { getBoard, getWebsite } from '@/queries/prisma';
 import { getPageviewMetrics, getPageviewStats, getWebsiteStats } from '@/queries/sql';
 import { validateBoardDraft } from './board-draft';
 import { withAiRead } from './query';
+import { discoverAnalytics } from './discovery';
+import {
+  analyticsDiscoverSchema,
+  validateAnalyticsDiscoverArgs,
+  validateAiResult,
+  type AiEvent,
+} from './rpc/contract';
 import { AI_LIMITS, runAiTurn, type AiReadTool, type AiTurn } from './runtime';
 
 const bodySchema = z
@@ -34,6 +41,7 @@ const dates = {
   endAt: z.number().int().min(0).max(8_640_000_000_000_000),
 };
 const schemas = {
+  analytics_discover: analyticsDiscoverSchema,
   analytics_summary: z.object(dates).strict(),
   analytics_breakdown: z
     .object({
@@ -122,7 +130,12 @@ export async function handleAiChat(
   runtime: (input: AiTurn) => ReturnType<typeof runAiTurn> = runAiTurn,
 ) {
   let admitted = false;
-  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(AI_LIMITS.timeoutMs)]);
+  const cancellation = new AbortController();
+  const signal = AbortSignal.any([
+    request.signal,
+    cancellation.signal,
+    AbortSignal.timeout(AI_LIMITS.timeoutMs),
+  ]);
   try {
     if (process.env.AI_ENABLED !== 'true') fail(503, 'AI board assistance is disabled.');
     const authenticated = await bounded(() => withAiRead(() => checkAuth(request), signal), signal);
@@ -205,6 +218,13 @@ export async function handleAiChat(
         signal.throwIfAborted();
         if (!acceptingTools || ++calls > AI_LIMITS.tools || reading || queries >= 2)
           fail(429, 'AI read limit reached.');
+        if (name === 'analytics_discover') {
+          try {
+            args = validateAnalyticsDiscoverArgs(args, Date.now());
+          } catch {
+            fail(400, 'Invalid analytics request.');
+          }
+        }
         if (
           !Object.hasOwn(schemas, name) ||
           Buffer.byteLength(JSON.stringify(args)) > AI_LIMITS.toolBytes
@@ -213,6 +233,13 @@ export async function handleAiChat(
         const parsedArgs = schemas[name].safeParse(args);
         if (!parsedArgs.success) fail(400, 'Invalid analytics request.');
         const a = parsedArgs.data;
+        if (
+          name === 'analytics_discover' &&
+          (!context.websiteIds.includes(a.websiteId) ||
+            a.startAt < context.startAt ||
+            a.endAt > context.endAt)
+        )
+          fail(400, 'Use the selected website and date range.');
         if (a.endAt < a.startAt || a.endAt > Date.now() || a.endAt - a.startAt > 31 * 86_400_000)
           fail(400, 'Analytics range must be at most 31 days and not in the future.');
         reading = true;
@@ -230,7 +257,8 @@ export async function handleAiChat(
           );
           readSignal.throwIfAborted();
           let data: unknown;
-          if (name === 'analytics_summary') data = await getWebsiteStats(a.websiteId, filters);
+          if (name === 'analytics_discover') data = await discoverAnalytics(a, Date.now());
+          else if (name === 'analytics_summary') data = await getWebsiteStats(a.websiteId, filters);
           else if (name === 'analytics_timeseries')
             data = await getPageviewStats(a.websiteId, filters);
           else {
@@ -272,50 +300,159 @@ export async function handleAiChat(
       startAt: Math.max(0, endAt - 30 * 86_400_000),
       endAt,
     };
-    const result = await bounded(
-      () =>
-        runtime({
-          messages: input.messages,
-          draft: draft ?? currentDraft,
-          context,
-          signal,
-          executeTool,
-        }).finally(() => {
-          acceptingTools = false;
-        }),
-      signal,
-    );
-    if (toolFailure) throw toolFailure;
-    if (reading) fail(502, 'AI read has not completed.');
-    if (
-      !result ||
-      Object.keys(result).some(key => !['message', 'draft'].includes(key)) ||
-      typeof result.message !== 'string' ||
-      !result.message.trim() ||
-      result.message.length > 2000 ||
-      Array.from(result.message).some(
-        c => c === '<' || c === '>' || (c.charCodeAt(0) < 32 && c !== '\n' && c !== '\t'),
-      )
-    )
-      fail(502, 'Invalid AI response.');
-    let finalDraft: BoardParameters | undefined;
-    if (result.draft !== undefined) {
+    const finish = async (onEvent?: (event: AiEvent) => void) => {
+      const result = await bounded(
+        () =>
+          runtime({
+            messages: input.messages,
+            draft: draft ?? currentDraft,
+            context,
+            signal,
+            executeTool,
+            onEvent,
+          }).finally(() => {
+            acceptingTools = false;
+          }),
+        signal,
+      );
+      if (toolFailure) throw toolFailure;
+      if (reading) fail(502, 'AI read has not completed.');
+      let validated;
       try {
-        finalDraft = validateBoardDraft(result.draft);
+        validated = validateAiResult(result);
       } catch {
-        fail(502, 'Invalid AI board proposal.');
+        fail(502, 'Invalid AI response.');
       }
-    }
-    await bounded(
-      () =>
-        withAiRead(async () => {
-          await authorize(draft);
-          await authorize(finalDraft);
-          for (const id of readWebsites) await website(id);
-        }, signal),
-      signal,
+      const finalDraft = validated.draft;
+      await bounded(
+        () =>
+          withAiRead(async () => {
+            await authorize(draft);
+            await authorize(finalDraft);
+            for (const id of readWebsites) await website(id);
+          }, signal),
+        signal,
+      );
+      signal.throwIfAborted();
+      return validated;
+    };
+    if (
+      !request.headers
+        .get('accept')
+        ?.split(',')
+        .some(value => value.trim() === 'text/event-stream')
+    )
+      return response(200, await finish());
+
+    // Drop progress under backpressure; wait for demand before terminal delivery.
+    // The terminal pair is bounded and query cleanup never waits on the consumer.
+    let closed = false;
+    let frames = 0;
+    let bytes = 0;
+    let removeAbort = () => {};
+    let demand: (() => void) | undefined;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          const close = () => {
+            if (closed) return;
+            closed = true;
+            removeAbort();
+            demand?.();
+            demand = undefined;
+            controller.close();
+          };
+          const send = (event: AiEvent) => {
+            if (
+              closed ||
+              request.signal.aborted ||
+              cancellation.signal.aborted ||
+              (signal.aborted && event.type !== 'error')
+            )
+              return;
+            const frame = new TextEncoder().encode(
+              `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
+            );
+            if (
+              frame.byteLength > AI_LIMITS.toolBytes + 1024 ||
+              bytes + frame.byteLength > AI_LIMITS.outputBytes
+            ) {
+              cancellation.abort();
+              close();
+              return;
+            }
+            bytes += frame.byteLength;
+            controller.enqueue(frame);
+          };
+          const abort = () => {
+            // Deadline is a host failure, not a disconnected reader. A single bounded
+            // error may bypass backpressure; close prevents the rejection path duplicating it.
+            if (!request.signal.aborted && !cancellation.signal.aborted)
+              send({ type: 'error', error: 'AI assistance could not complete. Try again.' });
+            close();
+          };
+          signal.addEventListener('abort', abort, { once: true });
+          removeAbort = () => signal.removeEventListener('abort', abort);
+          void finish(event => {
+            if (
+              event.type !== 'progress' ||
+              !['start', 'check', 'read', 'prepare', 'validate'].includes(event.phase)
+            )
+              return;
+            if (++frames <= 20 && (controller.desiredSize ?? 0) > 0)
+              send({ type: 'progress', phase: event.phase });
+          })
+            .then(async result => {
+              if ((controller.desiredSize ?? 0) <= 0 && !closed && !signal.aborted)
+                await new Promise<void>(resolve => {
+                  demand = resolve;
+                });
+              if (closed || signal.aborted) return;
+              // A slow consumer may have waited since generation: recheck at delivery too.
+              await bounded(
+                () =>
+                  withAiRead(async () => {
+                    await authorize(draft);
+                    await authorize(result.draft);
+                    for (const id of readWebsites) await website(id);
+                  }, signal),
+                signal,
+              );
+              if (closed || signal.aborted) return;
+              send({ type: 'progress', phase: 'complete' });
+              send({ type: 'result', result });
+            })
+            .catch(() => {
+              send({ type: 'error', error: 'AI assistance could not complete. Try again.' });
+            })
+            .finally(() => {
+              turns--;
+              close();
+            });
+          if (signal.aborted) abort();
+        },
+        pull() {
+          demand?.();
+          demand = undefined;
+        },
+        cancel() {
+          closed = true;
+          removeAbort();
+          demand?.();
+          demand = undefined;
+          cancellation.abort();
+        },
+      },
+      { highWaterMark: 1 },
     );
-    return response(200, { message: result.message, ...(finalDraft ? { draft: finalDraft } : {}) });
+    admitted = false; // Stream lifetime owns admission cleanup now.
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-store',
+        'X-Accel-Buffering': 'no',
+      },
+    });
   } catch (error) {
     if (error instanceof AiError) return response(error.status, { error: error.message });
     if (signal.aborted)
