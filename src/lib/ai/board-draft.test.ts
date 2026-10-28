@@ -41,6 +41,56 @@ const draft = (widget: Record<string, unknown> = component()) => ({
 
 // All strings/IDs are synthetic. No network, server imports, or production fixtures.
 describe('validateBoardDraft', () => {
+  it.each(['visitors', 'pageviews'])('accepts comparison %s without a root website', metric => {
+    for (const unit of [undefined, 'hour', 'day', 'month']) {
+      const input = {
+        rows: draft(
+          component('WebsiteCompareChart', {
+            websiteIds: [websiteId, otherId],
+            metric,
+            ...(unit ? { unit } : {}),
+          }),
+        ).rows,
+      };
+      expect(validateBoardDraft(input)).toEqual(input);
+    }
+  });
+
+  it.each([
+    {},
+    { websiteIds: [], metric: 'visitors' },
+    { websiteIds: [websiteId], metric: 'visitors' },
+    { websiteIds: [websiteId, websiteId.toUpperCase()], metric: 'visitors' },
+    { websiteIds: [websiteId, 'bad'], metric: 'visitors' },
+    { websiteIds: [websiteId, otherId], metric: 'visits' },
+    { websiteIds: [websiteId, otherId], metric: 'visitors', unit: 'week' },
+    { websiteIds: [websiteId, otherId], metric: 'visitors', websiteId },
+    {
+      websiteIds: Array.from(
+        { length: 11 },
+        (_, i) => `${String(i).padStart(8, '0')}-1234-4234-8234-123456789abc`,
+      ),
+      metric: 'visitors',
+    },
+  ])('rejects invalid comparison props %j', props => {
+    expect(() => validateBoardDraft(draft(component('WebsiteCompareChart', props)))).toThrow();
+  });
+
+  it('rejects comparison component entity aliases even when inherited', () => {
+    for (const key of ['entityId', 'websiteId', 'entityType']) {
+      expect(() =>
+        validateBoardDraft(
+          draft({
+            ...component('WebsiteCompareChart', {
+              websiteIds: [websiteId, otherId],
+              metric: 'visitors',
+            }),
+            [key]: key === 'entityType' ? 'website' : websiteId,
+          }),
+        ),
+      ).toThrow();
+    }
+  });
   it.each([
     component('WebsiteMetricsBar'),
     component('WebsiteChart'),

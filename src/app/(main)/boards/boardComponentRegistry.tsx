@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { WebsiteCompareChart } from '@/app/(main)/boards/WebsiteCompareChart';
 import { TextBlock } from '@/app/(main)/boards/TextBlock';
 import { BoardFunnel } from '@/app/(main)/websites/[websiteId]/(reports)/funnels/BoardFunnel';
 import { LinkMetricsBar } from '@/app/(main)/links/[linkId]/LinkMetricsBar';
@@ -36,7 +37,7 @@ import { CURRENCIES, DEFAULT_CURRENCY } from '@/lib/constants';
 export interface ConfigField {
   name: string;
   label: string;
-  type: 'select' | 'number' | 'text' | 'textarea' | 'report';
+  type: 'select' | 'number' | 'text' | 'textarea' | 'report' | 'websites';
   options?: { label: string; value: string }[];
   optionsByEntityType?: Record<string, { label: string; value: string }[]>;
   defaultValue?: any;
@@ -204,6 +205,41 @@ const componentDefinitions: ComponentDefinition[] = [
     group: 'Traffic',
     icon: ChartColumnBig,
     component: WebsiteChart,
+  },
+  {
+    type: 'WebsiteCompareChart',
+    name: 'Website comparison',
+    description: 'Compare visitors or page views across websites',
+    category: 'overview',
+    group: 'Traffic',
+    icon: ChartColumnBig,
+    component: WebsiteCompareChart,
+    requiresWebsite: false,
+    defaultProps: { websiteIds: [], metric: 'visitors' },
+    configFields: [
+      { name: 'websiteIds', label: 'Websites (2–10)', type: 'websites', required: true },
+      {
+        name: 'metric',
+        label: 'Metric',
+        type: 'select',
+        defaultValue: 'visitors',
+        options: [
+          { label: 'Visitors', value: 'visitors' },
+          { label: 'Page views', value: 'pageviews' },
+        ],
+      },
+      {
+        name: 'unit',
+        label: 'Interval',
+        type: 'select',
+        options: [
+          { label: 'Board date range', value: '' },
+          { label: 'Hour', value: 'hour' },
+          { label: 'Day', value: 'day' },
+          { label: 'Month', value: 'month' },
+        ],
+      },
+    ],
   },
   {
     type: 'UTM',

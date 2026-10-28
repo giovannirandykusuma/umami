@@ -4,7 +4,46 @@ import {
   BOARD_COMPONENT_COMPATIBILITY_MATRIX,
   getSupportedBoardComponentEntityTypes,
 } from './boardComponentCompatibility';
-import { BOARD_ENTITY_TYPES, isBoardComponentSupported } from './boards';
+import { BOARD_ENTITY_TYPES, getBoardEntityIds, isBoardComponentSupported } from './boards';
+
+test('comparison websites are included in board permission checks for every board type', () => {
+  for (const type of ['dashboard', 'mixed', 'website', 'pixel', 'link']) {
+    const board = {
+      type,
+      parameters: {
+        websiteId: 'root',
+        pixelId: 'pixel',
+        linkId: 'link',
+        rows: [
+          {
+            id: 'row',
+            columns: [
+              {
+                id: 'column',
+                component: {
+                  type: 'WebsiteCompareChart',
+                  props: { websiteIds: ['first', 'second', 'root'] },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    expect(getBoardEntityIds(board)).toEqual({
+      websiteIds: ['root', 'first', 'second'],
+      pixelIds: ['pixel'],
+      linkIds: ['link'],
+    });
+    expect(isBoardComponentSupported('WebsiteCompareChart', type as any)).toBe(true);
+  }
+  expect(getComponentDefinition('WebsiteCompareChart')?.requiresWebsite).toBe(false);
+  expect(
+    getComponentDefinition('WebsiteCompareChart')?.configFields?.find(
+      field => field.name === 'websiteIds',
+    )?.type,
+  ).toBe('websites');
+});
 
 test('isBoardComponentSupported allows events chart on website boards', () => {
   expect(isBoardComponentSupported('EventsChart', BOARD_ENTITY_TYPES.website)).toBe(true);

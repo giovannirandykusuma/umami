@@ -3,7 +3,8 @@ import type { BoardParameters } from '@/lib/types';
 /**
  * Strict AI staging boundary, NOT authorization or a replacement for manual-board schemas.
  * Supports WebsiteMetricsBar, WebsiteChart, WorldMap (no props), MetricsTable
- * (required supported type and optional numeric limit 5/10/20), and TextBlock (required text).
+ * (required supported type and optional numeric limit 5/10/20), TextBlock (required text),
+ * and WebsiteCompareChart (2–10 unique website UUIDs, visitors/pageviews, optional unit).
  * Table dimensions match the website renderer registry. No filters, render code,
  * report widgets, pixel/link entities, aggregate widgets, or arbitrary options.
  * Strings are untrusted display data, never instructions or executable markup.
@@ -42,7 +43,14 @@ const dimensions = [
   'event',
   'hostname',
 ];
-const widgets = ['WebsiteMetricsBar', 'WebsiteChart', 'WorldMap', 'MetricsTable', 'TextBlock'];
+const widgets = [
+  'WebsiteMetricsBar',
+  'WebsiteChart',
+  'WebsiteCompareChart',
+  'WorldMap',
+  'MetricsTable',
+  'TextBlock',
+];
 const forbidden = new Set(['__proto__', 'prototype', 'constructor']);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -147,6 +155,20 @@ export function validateBoardDraft(input: unknown): BoardParameters {
         if (['entityType', 'entityId', 'websiteId'].some(key => key in component)) fail();
         const props = object(component.props, ['text']);
         string(props.text, 4000);
+      } else if (component.type === 'WebsiteCompareChart') {
+        if (['entityType', 'entityId', 'websiteId'].some(key => key in component)) fail();
+        const props = object(component.props, ['websiteIds', 'metric', 'unit']);
+        if (
+          !Array.isArray(props.websiteIds) ||
+          props.websiteIds.length < 2 ||
+          props.websiteIds.length > 10
+        )
+          fail();
+        props.websiteIds.forEach(website);
+        if (new Set(props.websiteIds.map(id => id.toLowerCase())).size !== props.websiteIds.length)
+          fail();
+        if (!['visitors', 'pageviews'].includes(props.metric as string)) fail();
+        if ('unit' in props && !['hour', 'day', 'month'].includes(props.unit as string)) fail();
       } else {
         if ('entityType' in component && component.entityType !== 'website') fail();
         if ('entityId' in component) {

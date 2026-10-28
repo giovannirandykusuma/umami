@@ -192,6 +192,11 @@ export function getBoardEntityIds(board?: Pick<Board, 'type' | 'parameters'> | P
   for (const row of board?.parameters?.rows ?? []) {
     for (const column of row.columns ?? []) {
       const entity = getComponentEntity(column.component);
+      if (column.component?.type === 'WebsiteCompareChart') {
+        for (const id of column.component.props?.websiteIds ?? []) {
+          if (typeof id === 'string') websiteIds.add(id);
+        }
+      }
 
       if (entity.entityType === BOARD_ENTITY_TYPES.website && entity.entityId) {
         websiteIds.add(entity.entityId);

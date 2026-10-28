@@ -190,6 +190,20 @@ export function BoardComponentSelect({
   const reportOptionsByType = reportOptionsData ?? {};
   const hasRequiredConfig = selectedDef
     ? (selectedDef.configFields ?? []).every(field => {
+        if (field.type === 'websites') {
+          const ids = configValues[field.name];
+          return (
+            Array.isArray(ids) &&
+            ids.length >= 2 &&
+            ids.length <= 10 &&
+            ids.every(
+              id =>
+                typeof id === 'string' &&
+                /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
+            ) &&
+            new Set(ids.map(id => id.toLowerCase())).size === ids.length
+          );
+        }
         if (!field.required) {
           return true;
         }
@@ -209,7 +223,13 @@ export function BoardComponentSelect({
   };
 
   const handleAdd = () => {
-    if (!selectedDef || !isSelectedDefSupported || (needsWebsite && !resolvedEntityId)) return;
+    if (
+      !selectedDef ||
+      !isSelectedDefSupported ||
+      !hasRequiredConfig ||
+      (needsWebsite && !resolvedEntityId)
+    )
+      return;
 
     const props: Record<string, any> = {};
 
@@ -220,6 +240,9 @@ export function BoardComponentSelect({
     Object.assign(props, configValues);
 
     for (const field of selectedDef.configFields ?? []) {
+      if (selectedDef.type === 'WebsiteCompareChart' && field.name === 'unit' && !props.unit) {
+        delete props.unit;
+      }
       if (field.type === 'number' && props[field.name] != null && props[field.name] !== '') {
         props[field.name] = Number(props[field.name]);
       }
@@ -261,9 +284,10 @@ export function BoardComponentSelect({
     () =>
       allDefinitions.filter(
         def =>
-          isBoardComponentSupported(def.type, activeEntityType) || def.type === selectedDef?.type,
+          (hasSelectedEntity || def.requiresWebsite === false) &&
+          (isBoardComponentSupported(def.type, activeEntityType) || def.type === selectedDef?.type),
       ),
-    [activeEntityType, allDefinitions, selectedDef?.type],
+    [activeEntityType, allDefinitions, selectedDef?.type, hasSelectedEntity],
   );
   const groupedDefinitions = useMemo(() => {
     const order = new Map(COMPONENT_GROUP_ORDER.map((group, index) => [group, index]));
@@ -387,6 +411,51 @@ export function BoardComponentSelect({
                     </Select>
                   )}
 
+                  {field.type === 'websites' && (
+                    <Column gap="2">
+                      {(Array.isArray(configValues[field.name])
+                        ? configValues[field.name]
+                        : []
+                      ).map((id: string, index: number) => (
+                        <Row key={index} gap="2">
+                          <WebsiteSelect
+                            websiteId={id}
+                            teamId={teamId}
+                            onChange={value => {
+                              const ids = [...configValues[field.name]];
+                              ids[index] = value as string;
+                              handleConfigChange(field.name, ids);
+                            }}
+                          />
+                          <Button
+                            variant="quiet"
+                            onPress={() =>
+                              handleConfigChange(
+                                field.name,
+                                configValues[field.name].filter(
+                                  (_: string, i: number) => i !== index,
+                                ),
+                              )
+                            }
+                          >
+                            Remove
+                          </Button>
+                        </Row>
+                      ))}
+                      <Button
+                        isDisabled={(configValues[field.name]?.length ?? 0) >= 10}
+                        onPress={() =>
+                          handleConfigChange(field.name, [...(configValues[field.name] ?? []), ''])
+                        }
+                      >
+                        Add website
+                      </Button>
+                      <Text size="sm" color="muted">
+                        Select 2–10 different websites.
+                      </Text>
+                    </Column>
+                  )}
+
                   {field.type === 'text' && (
                     <TextField
                       value={String(configValues[field.name] ?? field.defaultValue ?? '')}
@@ -448,7 +517,7 @@ export function BoardComponentSelect({
         <Column gap="3" height="100%" style={{ width: 280, flexShrink: 0, minWidth: 0 }}>
           <Text weight="bold">Components</Text>
           <Column border="left" paddingLeft="4" height="100%" style={{ minHeight: 0 }}>
-            {hasSelectedEntity ? (
+            {availableDefinitions.length > 0 ? (
               <Column gap="1" height="100%" style={{ overflowY: 'auto', minHeight: 0 }}>
                 {groupedDefinitions.map(({ group, definitions }) => (
                   <Column key={group} gap="1" paddingBottom="2">
