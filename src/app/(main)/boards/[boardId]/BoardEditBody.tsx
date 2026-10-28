@@ -164,7 +164,7 @@ export function BoardEditBody({ requiresBoardWebsite = true }: { requiresBoardWe
           <Panel minSize={BUTTON_ROW_HEIGHT}>
             <Row paddingY="3">
               <TooltipTrigger delay={0}>
-                <Button variant="outline" onPress={handle}>
+                <Button variant="outline" onPress={handle} aria-label="Add row">
                   <Icon>
                     <Plus />
                   </Icon>

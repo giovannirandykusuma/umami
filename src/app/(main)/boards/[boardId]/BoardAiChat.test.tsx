@@ -68,13 +68,15 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('AI board draft preview', () => {
   it('applies only a validated local draft and includes the existing board ID', async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue({ ok: true, json: async () => ({ message: '<b>Preview</b>', draft }) });
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Preview', draft }), {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
     vi.stubGlobal('fetch', fetcher);
     const { updateBoard } = setup();
     ask();
-    await screen.findByText('<b>Preview</b>');
+    await screen.findByText('Preview');
     expect(updateBoard).toHaveBeenCalledWith({ parameters: draft });
     expect(JSON.parse(fetcher.mock.calls[0][1].body).boardId).toBe(
       '22222222-2222-4222-8222-222222222222',
@@ -237,7 +239,83 @@ describe('AI board draft preview', () => {
     );
     const { updateBoard } = setup();
     ask();
-    await screen.findByText(/unsupported draft/);
+    await screen.findByText(/unsupported response/);
+    expect(updateBoard).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe assistant HTML under the shared result schema', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            message: '<script>bad</script>',
+            draft,
+          }),
+          { headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    const { updateBoard } = setup();
+    ask();
+    await screen.findByText(/unsupported response/);
+    expect(document.querySelector('script')).toBeNull();
+    expect(updateBoard).not.toHaveBeenCalled();
+  });
+
+  it('streams only fixed phases, then offers editable options without sending question metadata', async () => {
+    let streamController: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    });
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'Thanks' })));
+    vi.stubGlobal('fetch', fetcher);
+    const { updateBoard } = setup();
+    ask();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+    streamController.enqueue(
+      new TextEncoder().encode('event: progress\ndata: {"type":"progress","phase":"read"}\n\n'),
+    );
+    await screen.findByText('Reading authorized analytics');
+    expect(updateBoard).not.toHaveBeenCalled();
+    const result = {
+      message: 'Please confirm the meaning.',
+      questions: [
+        {
+          id: 'meaning',
+          question: 'Which event?',
+          options: [{ label: 'Confirmed', value: 'confirmed_login' }],
+        },
+      ],
+    };
+    streamController.enqueue(
+      new TextEncoder().encode(
+        `event: result\ndata: ${JSON.stringify({ type: 'result', result })}\n\n`,
+      ),
+    );
+    streamController.close();
+    await screen.findByText('Please confirm the meaning.');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmed' }));
+    expect(screen.getByLabelText('Describe your board or a change')).toHaveFocus();
+    expect(screen.getByLabelText('Describe your board or a change')).toHaveValue(
+      'Which event?\nConfirmed: confirmed_login',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Ask AI' }));
+    await screen.findByText('Thanks');
+    const payload = JSON.parse(fetcher.mock.calls[1][1].body);
+    expect(payload.messages.at(-1)).toEqual({
+      role: 'user',
+      content: 'Which event?\nConfirmed: confirmed_login',
+    });
+    expect(payload.messages[1]).toEqual({ role: 'assistant', content: result.message });
+    expect(fetcher.mock.calls[0][1].headers.Accept).toBe('text/event-stream');
     expect(updateBoard).not.toHaveBeenCalled();
   });
 

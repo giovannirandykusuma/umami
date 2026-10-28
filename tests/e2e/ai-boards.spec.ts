@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { createServer } from 'node:http';
 
 // Synthetic browser HTTP only: never authenticates against a database or model provider.
 const boardId = '22222222-2222-4222-8222-222222222222';
@@ -149,6 +150,142 @@ test('HTTP errors preserve manual layout and allow retry', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Ask AI', exact: true })).toBeEnabled();
   expect(writes).toHaveLength(0);
 });
+
+const sse = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+
+// Real incremental HTTP bytes, not a mock component or an injected browser fetch.
+async function streamingFixture(
+  page: Page,
+  run: (send: (text: string) => void, end: () => void) => void,
+) {
+  const connections = new Set<any>();
+  const server = createServer((request, response) => {
+    response.setHeader('Access-Control-Allow-Origin', 'http://127.0.0.1:3317');
+    response.setHeader('Access-Control-Allow-Headers', 'content-type,authorization');
+    if (request.method === 'OPTIONS') {
+      response.end();
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'text/event-stream' });
+    response.flushHeaders();
+    run(
+      text => response.write(text),
+      () => response.end(),
+    );
+  });
+  server.on('connection', socket => {
+    connections.add(socket);
+    socket.on('close', () => connections.delete(socket));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address() as { port: number };
+  await page.route('**/api/ai/boards/chat', route =>
+    route.continue({
+      url: `http://127.0.0.1:${address.port}/stream`,
+    }),
+  );
+  return async () => {
+    for (const socket of connections) socket.destroy();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  };
+}
+
+test('discovery questions send selected and free answers as ordinary bounded messages', async ({
+  page,
+}) => {
+  const requests: any[] = [];
+  await page.route('**/api/ai/boards/chat', async route => {
+    requests.push(route.request().postDataJSON());
+    await route.fulfill({
+      contentType: 'text/event-stream',
+      body: sse('result', {
+        type: 'result',
+        result:
+          requests.length < 3
+            ? {
+                message: 'An event name alone does not confirm successful login.',
+                questions: [
+                  {
+                    id: 'meaning',
+                    question: 'Which event means successful login?',
+                    options: [{ label: 'Confirmed login', value: 'confirmed_login' }],
+                  },
+                ],
+              }
+            : {
+                message: 'Review this preview, then Save.',
+                draft: draft('Confirmed login summary'),
+              },
+      }),
+    });
+  });
+  const writes = await fixture(page);
+  await expect(page.getByText(/No website selected/)).toBeVisible();
+  await ask(page, 'How many people logged in?');
+  await page.getByRole('button', { name: 'Confirmed login', exact: true }).click();
+  await expect(page.getByLabel('Describe your board or a change')).toBeFocused();
+  await expect(page.getByLabel('Describe your board or a change')).toHaveValue(/confirmed_login/);
+  await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  await page.getByRole('button', { name: 'Write my own answer' }).last().click();
+  await page
+    .getByLabel('Describe your board or a change')
+    .fill('Use confirmed_login; only success=true means successful login.');
+  await page.getByRole('button', { name: 'Ask AI', exact: true }).click();
+  await expect(page.getByText('Confirmed login summary', { exact: true })).toBeVisible();
+  expect(requests[1].messages.at(-1).content).toContain('confirmed_login');
+  expect(requests[2].messages.at(-1).content).toContain('success=true');
+  expect(
+    requests[2].messages.every(
+      (message: any) => Object.keys(message).sort().join(',') === 'content,role',
+    ),
+  ).toBe(true);
+  expect(writes).toHaveLength(0);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => writes.length).toBe(1);
+});
+
+for (const action of ['cancel', 'truncate', 'manual edit'] as const) {
+  test(`real streaming progress and ${action} never applies an incomplete or stale draft`, async ({
+    page,
+  }) => {
+    let finish = () => {};
+    const close = await streamingFixture(page, (send, end) => {
+      send(sse('progress', { type: 'progress', phase: 'read' }));
+      finish = () => {
+        send(sse('progress', { type: 'progress', phase: 'complete' }));
+        if (action !== 'truncate')
+          send(
+            sse('result', {
+              type: 'result',
+              result: { message: 'Late', draft: draft('Must not appear') },
+            }),
+          );
+        end();
+      };
+    });
+    try {
+      const writes = await fixture(page);
+      await ask(page);
+      await expect(page.getByText('Reading authorized analytics', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+      if (action === 'cancel') await page.getByRole('button', { name: 'Cancel AI' }).click();
+      if (action === 'manual edit') {
+        await page.getByRole('button', { name: 'Add row', exact: true }).click();
+      }
+      finish();
+      await expect(
+        page.getByText(
+          action === 'truncate' ? /incomplete or invalid response/ : /AI request cancelled/,
+        ),
+      ).toBeVisible();
+      await expect(page.getByText('Must not appear', { exact: true })).toHaveCount(0);
+      expect(writes).toHaveLength(0);
+    } finally {
+      await close();
+    }
+  });
+}
 
 test('unsupported board types explain the website-only boundary', async ({ page }) => {
   await fixture(page, 'pixel');

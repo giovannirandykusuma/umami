@@ -3,14 +3,23 @@ import { Button } from '@umami/react-zen';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBoard } from '@/components/hooks';
 import { validateBoardDraft } from '@/lib/ai/board-draft';
-import { AI_LIMITS } from '@/lib/ai/rpc/contract';
+import { AI_LIMITS, type AiPhase, type AiQuestion, validateAiResult } from '@/lib/ai/rpc/contract';
 import { getApiUrl } from '@/lib/api-url';
 import { getClientAuthToken } from '@/lib/client';
 import { getBoardEntityIds, getBoardType } from '@/lib/boards';
 import type { BoardParameters } from '@/lib/types';
 import styles from './BoardAiChat.module.css';
+import { readAiStream } from './ai-stream';
 
-type Message = { role: 'user' | 'assistant'; content: string };
+type Message = { role: 'user' | 'assistant'; content: string; questions?: AiQuestion[] };
+const phaseLabels: Record<AiPhase, string> = {
+  start: 'Starting your request',
+  check: 'Checking available context',
+  read: 'Reading authorized analytics',
+  prepare: 'Preparing a response',
+  validate: 'Validating the draft',
+  complete: 'Checks complete · waiting for the result',
+};
 
 /** Manual boards remain unrestricted. Only the AI boundary uses this strict subset. */
 export function getAiInput(board: Parameters<typeof getBoardType>[0]): {
@@ -45,6 +54,7 @@ export function BoardAiChat() {
   const [prompt, setPrompt] = useState('');
   const [notice, setNotice] = useState('');
   const [unavailable, setUnavailable] = useState(false);
+  const [phase, setPhase] = useState<AiPhase>('start');
   const active = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { draft, reason } = getAiInput(board);
@@ -55,6 +65,7 @@ export function BoardAiChat() {
     active.current = null;
     setAiPending(false);
     setNotice('AI request cancelled. Your draft is unchanged.');
+    inputRef.current?.focus();
   }, [setAiPending]);
 
   useEffect(() => {
@@ -80,7 +91,13 @@ export function BoardAiChat() {
     const next: Message[] = [...messages, { role: 'user' as const, content: prompt.trim() }].slice(
       -23,
     );
-    let body = JSON.stringify({ boardId: board.id, messages: next, draft });
+    const requestBody = () =>
+      JSON.stringify({
+        boardId: board.id,
+        messages: next.map(({ role, content }) => ({ role, content })),
+        draft,
+      });
+    let body = requestBody();
     while (new TextEncoder().encode(body).byteLength > AI_LIMITS.inputBytes) {
       if (next.length === 1) {
         setMessages([]);
@@ -90,7 +107,7 @@ export function BoardAiChat() {
         return;
       }
       next.shift();
-      body = JSON.stringify({ boardId: board.id, messages: next, draft });
+      body = requestBody();
     }
     const controller = new AbortController();
     active.current = controller;
@@ -98,17 +115,18 @@ export function BoardAiChat() {
     setPrompt('');
     setNotice('');
     setAiPending(true);
+    setPhase('start');
     try {
       const response = await fetch(getApiUrl('/ai/boards/chat', { apiUrl: '' }), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
           authorization: `Bearer ${getClientAuthToken()}`,
         },
         body,
         signal: controller.signal,
       });
-      const data = await response.json();
       if (active.current !== controller || controller.signal.aborted) return;
       if (!response.ok) {
         if (response.status === 503) setUnavailable(true);
@@ -121,10 +139,16 @@ export function BoardAiChat() {
         };
         throw new Error(errors[response.status] || 'AI could not complete the request. Try again.');
       }
-      if (typeof data.message !== 'string' || !data.message.trim() || data.message.length > 4000) {
-        throw new Error('AI returned an invalid response. Your draft is unchanged.');
-      }
-      const candidate = data.draft === undefined ? undefined : validateBoardDraft(data.draft);
+      const streamed = response.headers?.get('content-type')?.includes('text/event-stream');
+      const data = validateAiResult(
+        streamed && response.body
+          ? await readAiStream(response.body, controller.signal, value => {
+              if (active.current === controller && !controller.signal.aborted) setPhase(value);
+            })
+          : await response.json(),
+      );
+      if (active.current !== controller || controller.signal.aborted) return;
+      const candidate = data.draft;
       if (
         candidate &&
         getBoardType(board) === 'website' &&
@@ -135,7 +159,11 @@ export function BoardAiChat() {
       // Clear before updateBoard: provider cancels requests on every manual update.
       active.current = null;
       if (candidate) updateBoard({ parameters: candidate });
-      setMessages([...next, { role: 'assistant', content: data.message }].slice(-24) as Message[]);
+      setMessages(
+        [...next, { role: 'assistant', content: data.message, questions: data.questions }].slice(
+          -24,
+        ) as Message[],
+      );
       setNotice(
         candidate
           ? 'Draft preview updated. Review it, then choose Save to keep changes.'
@@ -144,9 +172,12 @@ export function BoardAiChat() {
     } catch (error) {
       if (active.current !== controller || controller.signal.aborted) return;
       setNotice(
-        error instanceof Error && error.message !== 'Invalid board draft'
+        error instanceof Error &&
+          /^(AI |Sign in again|You do not have access|This board or website selection)/.test(
+            error.message,
+          )
           ? error.message
-          : 'AI returned an unsupported draft. Your draft is unchanged.',
+          : 'AI returned an unsupported response. Your draft is unchanged.',
       );
     } finally {
       if (active.current === controller) active.current = null;
@@ -162,10 +193,27 @@ export function BoardAiChat() {
         <span>Draft preview only</span>
       </div>
       <p id="board-ai-help" className={styles.help}>
-        Ask for a website summary, breakdown or daily pageviews chart. Choose a website in your
-        request. AI can make mistakes. Only Save keeps changes. Chat clears when you leave or
-        refresh.
+        Start with a goal. The assistant can check available analytics and ask when something is
+        unclear. Review the local preview, then choose Save to keep it. Chat clears when you leave.
       </p>
+      <div className={styles.context}>
+        <strong>Working context</strong>
+        <p>
+          {board.parameters?.websiteId
+            ? 'Website selected in this board.'
+            : 'No website selected. Tell the assistant which website to use.'}
+        </p>
+        <p>
+          Date range and event meanings are not confirmed here. The assistant must check authorized
+          data, not infer what an event means.
+        </p>
+      </div>
+      {!messages.length && (
+        <p className={styles.help}>
+          What would you like to understand? Try “Help me understand how visitors reach my most
+          popular pages.”
+        </p>
+      )}
       {reason && <p role="status">{reason}</p>}
       {messages.length > 0 && (
         <div
@@ -178,11 +226,55 @@ export function BoardAiChat() {
             <div key={index} className={styles.message}>
               <strong>{message.role === 'user' ? 'You' : 'Assistant'}</strong>
               <p>{message.content}</p>
+              {message.questions?.map(question => (
+                <fieldset
+                  key={question.id}
+                  className={styles.question}
+                  disabled={aiPending || isPending || unavailable}
+                >
+                  <legend>{question.question}</legend>
+                  <div className={styles.options}>
+                    {question.options?.map(option => (
+                      <Button
+                        key={option.value}
+                        type="button"
+                        variant="outline"
+                        onPress={() => {
+                          setPrompt(`${question.question}\n${option.label}: ${option.value}`);
+                          inputRef.current?.focus();
+                        }}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="quiet"
+                      onPress={() => {
+                        setPrompt(`${question.question}\n`);
+                        inputRef.current?.focus();
+                      }}
+                    >
+                      Write my own answer
+                    </Button>
+                  </div>
+                </fieldset>
+              ))}
             </div>
           ))}
         </div>
       )}
+      {aiPending && (
+        <div className={styles.progress} role="status" aria-live="polite">
+          <strong>{phaseLabels[phase]}</strong>
+          <p>
+            No changes are applied until a validated result arrives. Cancel or edit manually to
+            stop.
+          </p>
+        </div>
+      )}
       <form
+        aria-busy={aiPending}
         onSubmit={event => {
           event.preventDefault();
           void send();
@@ -234,9 +326,7 @@ export function BoardAiChat() {
         </div>
       </form>
       <p className={styles.status} role="status" aria-live="polite">
-        {aiPending
-          ? 'Generating a local preview. You can cancel or edit manually to stop.'
-          : notice}
+        {aiPending ? '' : notice}
       </p>
     </section>
   );
