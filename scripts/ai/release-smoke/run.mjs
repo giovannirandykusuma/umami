@@ -211,7 +211,7 @@ try {
               : scriptedPrompt;
           // Respect the app's per-user 60s admission window before the next planned turn.
           // This is scheduling, not an HTTP retry: each planned request is issued exactly once.
-          if (discovery && previousCallStarted) await delay(Math.max(0, previousCallStarted + 61_000 - Date.now()));
+          if (discovery && previousCallStarted && process.env.RELEASE_SMOKE_IMMEDIATE !== '1') await delay(Math.max(0, previousCallStarted + 61_000 - Date.now()));
           previousCallStarted = Date.now();
           assert.ok(++liveCalls <= 3, 'live-call-budget');
           const messages = [...(scenario === 'followup' ? followupMessages : []), { role: 'user', content: prompt }];

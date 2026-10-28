@@ -5,22 +5,44 @@ import test from 'node:test';
 import vm from 'node:vm';
 import { loadSharedContract, readSmokeStream } from './run.mjs';
 
-const encodeFrame = (type, value) => `event: ${type}\ndata: ${JSON.stringify({ type, ...value })}\n\n`;
+const encodeFrame = (type, value) =>
+  `event: ${type}\ndata: ${JSON.stringify({ type, ...value })}\n\n`;
 function streamResponse(text, chunkSize = 7) {
   const bytes = new TextEncoder().encode(text);
-  return new Response(new ReadableStream({
-    start(controller) {
-      for (let i = 0; i < bytes.length; i += chunkSize) controller.enqueue(bytes.slice(i, i + chunkSize));
-      controller.close();
-    },
-  }), { headers: { 'Content-Type': 'text/event-stream' } });
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        for (let i = 0; i < bytes.length; i += chunkSize)
+          controller.enqueue(bytes.slice(i, i + chunkSize));
+        controller.close();
+      },
+    }),
+    { headers: { 'Content-Type': 'text/event-stream' } },
+  );
 }
 
 test('SSE accepts bounded progress, optional questions, fragmented UTF-8 and EOF', async () => {
-  const result = { message: 'Please clarify café login.', questions: [{ id: 'event', question: 'Which event?', options: [{ value: 'login', label: 'Login' }, { value: 'page', label: 'Login page' }] }] };
+  const result = {
+    message: 'Please clarify café login.',
+    questions: [
+      {
+        id: 'event',
+        question: 'Which event?',
+        options: [
+          { value: 'login', label: 'Login' },
+          { value: 'page', label: 'Login page' },
+        ],
+      },
+    ],
+  };
   const { validateAiResult } = await loadSharedContract();
   const expected = validateAiResult(result);
-  const response = await readSmokeStream(streamResponse(encodeFrame('progress', { phase: 'read' }) + encodeFrame('result', { result }), 1));
+  const response = await readSmokeStream(
+    streamResponse(
+      encodeFrame('progress', { phase: 'read' }) + encodeFrame('result', { result }),
+      1,
+    ),
+  );
   assert.deepEqual(response.result, expected);
   assert.deepEqual(response.phases, ['read']);
   assert.equal(response.eof, true);
@@ -30,14 +52,20 @@ test('SSE accepts bounded progress, optional questions, fragmented UTF-8 and EOF
 test('SSE rejects malformed, duplicate, missing, oversized or post-terminal frames', async () => {
   const final = encodeFrame('result', { result: { message: 'Done.' } });
   for (const text of [
-    '', final + final, final + encodeFrame('progress', { phase: 'read' }), final.slice(0, -1),
+    '',
+    final + final,
+    final + encodeFrame('progress', { phase: 'read' }),
+    final.slice(0, -1),
     'event: result\ndata: not-json\n\n',
     encodeFrame('error', { message: 'upstream secret' }),
-    encodeFrame('result', { result: { message: 'Unsafe', questions: [{ id: 'q', question: 'Run?', command: 'execute' }] } }),
+    encodeFrame('result', {
+      result: { message: 'Unsafe', questions: [{ id: 'q', question: 'Run?', command: 'execute' }] },
+    }),
     encodeFrame('progress', { phase: 'invented' }),
     encodeFrame('progress', { phase: 'read' }).repeat(22) + final,
     'x'.repeat(33_100),
-  ]) await assert.rejects(readSmokeStream(streamResponse(text)));
+  ])
+    await assert.rejects(readSmokeStream(streamResponse(text)));
 });
 
 test('preserves the exact advertised model ID including both hyphens', () => {
@@ -59,7 +87,7 @@ test('ordinary and unsupported probes use natural language rather than scripted 
   );
   assert.ok(source.includes("? 'I want you to create like the number of usernames"));
   assert.ok(source.includes('const body = validateAiResult(stream.result)'));
-  assert.ok(source.includes("assert.equal(body.draft, undefined)"));
+  assert.ok(source.includes('assert.equal(body.draft, undefined)'));
 });
 
 function fixture() {
@@ -81,7 +109,18 @@ test('discovery observation and fragmented canary detection expose only categori
   const { child, output } = fixture();
   assert.equal(child.stdin.write('CANARY_INVENTED_'), true);
   assert.equal(child.stdin.write('USERNAME_NEVER_EXPOSE'), true);
-  child.stdout.emit('data', JSON.stringify({ type: 'extension_ui_request', method: 'input', title: 'umami-host-tool', placeholder: JSON.stringify({ name: 'analytics_discover', args: { websiteId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', startAt: 1, endAt: 2 } }) }) + '\n');
+  child.stdout.emit(
+    'data',
+    JSON.stringify({
+      type: 'extension_ui_request',
+      method: 'input',
+      title: 'umami-host-tool',
+      placeholder: JSON.stringify({
+        name: 'analytics_discover',
+        args: { websiteId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', startAt: 1, endAt: 2 },
+      }),
+    }) + '\n',
+  );
   child.emit('close', 0, null);
   const report = JSON.parse(output[0].slice('RELEASE_SMOKE_DIAGNOSTIC '.length));
   assert.equal(report.categories.analytics_discover, 1);
