@@ -687,8 +687,157 @@ describe('permission-safe AI board staging', () => {
       if (result.status === 200) expect(Buffer.byteLength(body)).toBe(bytes);
     },
   );
-  it('rate limits per authenticated user', async () => {
-    expect((await handleAiChat(request(), ok)).status).toBe(200);
+  it('admits immediate clarification replies but caps six admitted turns per sliding minute', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+    const start = Date.now();
+    try {
+      expect(
+        (
+          await handleAiChat(request(), async () => ({
+            message: 'Please clarify.',
+            questions: [{ id: 'login', question: 'Which event means a successful login?' }],
+          }))
+        ).status,
+      ).toBe(200);
+      clock.mockReturnValue(start + 1000);
+      for (let i = 0; i < 5; i++) expect((await handleAiChat(request(), ok)).status).toBe(200);
+      expect((await handleAiChat(request(), ok)).status).toBe(429);
+      clock.mockReturnValue(start + 60_000);
+      expect((await handleAiChat(request(), ok)).status).toBe(200);
+      expect((await handleAiChat(request(), ok)).status).toBe(429);
+      clock.mockReturnValue(start + 61_000);
+      expect((await handleAiChat(request(), ok)).status).toBe(200);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+  it('counts malformed and scope-denied admitted attempts, not admission rejections', async () => {
+    for (let i = 0; i < 3; i++) expect((await handleAiChat(request({}), ok)).status).toBe(400);
+    vi.mocked(canViewWebsite).mockResolvedValue(false);
+    for (let i = 0; i < 3; i++) expect((await handleAiChat(request(), ok)).status).toBe(403);
     expect((await handleAiChat(request(), ok)).status).toBe(429);
+  });
+  it('rejects overlap, permits other users up to global concurrency two, and releases JSON errors', async () => {
+    const auth = (id: string) =>
+      vi.mocked(checkAuth).mockResolvedValue({
+        user: { id },
+        authType: 'session',
+      } as any);
+    const firstId = crypto.randomUUID();
+    const secondId = crypto.randomUUID();
+    const thirdId = crypto.randomUUID();
+    let release = () => {};
+    let entered = () => {};
+    const ready = new Promise<void>(resolve => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    auth(firstId);
+    const first = handleAiChat(request(), async () => {
+      entered();
+      await pending;
+      throw new Error('private provider failure');
+    });
+    await ready;
+    for (let i = 0; i < 7; i++) expect((await handleAiChat(request(), ok)).status).toBe(429);
+    auth(secondId);
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    const second = await handleAiChat(req, async input => {
+      input.onEvent?.({ type: 'progress', phase: 'start' });
+      return { message: 'Done' };
+    });
+    auth(thirdId);
+    const denied = await handleAiChat(request(), ok);
+    expect(denied.status).toBe(429);
+    expect(await denied.json()).toEqual({ error: 'AI is busy. Try again shortly.' });
+    await second.body!.cancel();
+    expect((await handleAiChat(request(), ok)).status).toBe(200);
+    release();
+    expect((await first).status).toBe(502);
+    auth(firstId);
+    expect((await handleAiChat(request(), ok)).status).toBe(200);
+  });
+  it('holds user admission through streaming backpressure and releases on terminal delivery', async () => {
+    const req = request();
+    req.headers.set('accept', 'text/event-stream');
+    const res = await handleAiChat(req, async input => {
+      input.onEvent?.({ type: 'progress', phase: 'start' });
+      return { message: 'Done' };
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(dbScope.active).toBe(0);
+    expect((await handleAiChat(request(), ok)).status).toBe(429);
+    expect(await res.text()).toContain('event: result');
+    expect((await handleAiChat(request(), ok)).status).toBe(200);
+  });
+  it.each(['cancel', 'disconnect', 'deadline', 'error'] as const)(
+    'releases streaming user admission exactly once on %s',
+    async mode => {
+      const controller = new AbortController();
+      const deadline = new AbortController();
+      const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
+      try {
+        const req = request(undefined, controller.signal);
+        req.headers.set('accept', 'text/event-stream');
+        const res = await handleAiChat(req, async input => {
+          if (mode === 'error') throw new Error('private');
+          input.onEvent?.({ type: 'progress', phase: 'start' });
+          await new Promise<void>(resolve => {
+            input.signal!.addEventListener('abort', () => resolve(), { once: true });
+          });
+          return { message: 'Discard' };
+        });
+        if (mode === 'cancel') await res.body!.cancel();
+        if (mode === 'disconnect') controller.abort();
+        if (mode === 'deadline') deadline.abort(new DOMException('Deadline', 'TimeoutError'));
+        if (mode !== 'cancel') {
+          const text = await res.text();
+          expect(text).not.toContain('private');
+          expect(text).not.toContain('event: result');
+        }
+        timeout.mockRestore();
+        await new Promise(resolve => setImmediate(resolve));
+        // An old stream's late cleanup must not release a newer admission.
+        const next = request();
+        next.headers.set('accept', 'text/event-stream');
+        const held = await handleAiChat(next, async input => {
+          input.onEvent?.({ type: 'progress', phase: 'start' });
+          return { message: 'Done' };
+        });
+        await new Promise(resolve => setImmediate(resolve));
+        expect((await handleAiChat(request(), ok)).status).toBe(429);
+        await held.body!.cancel();
+        expect((await handleAiChat(request(), ok)).status).toBe(200);
+      } finally {
+        timeout.mockRestore();
+      }
+    },
+  );
+  it('bounds the process-local user map and recovers capacity at expiry', async () => {
+    // Advance beyond earlier sliding-window test timestamps without waiting in real time.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 86_400_000);
+    try {
+      for (let i = 0; i < 1000; i++) {
+        vi.mocked(checkAuth).mockResolvedValue({
+          user: { id: crypto.randomUUID() },
+          authType: 'session',
+        } as any);
+        expect((await handleAiChat(request(), ok)).status).toBe(200);
+      }
+      // Existing users may still converse at map capacity.
+      expect((await handleAiChat(request(), ok)).status).toBe(200);
+      vi.mocked(checkAuth).mockResolvedValue({
+        user: { id: crypto.randomUUID() },
+        authType: 'session',
+      } as any);
+      expect((await handleAiChat(request(), ok)).status).toBe(429);
+      clock.mockReturnValue(Date.now() + 60_000);
+      expect((await handleAiChat(request(), ok)).status).toBe(200);
+    } finally {
+      clock.mockRestore();
+    }
   });
 });

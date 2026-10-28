@@ -77,7 +77,10 @@ function response(status: number, data: unknown) {
 }
 
 // Process-local public-staging admission control. No prompts, analytics or IDs are logged.
-const users = new Map<string, number>();
+// Six admitted turns per sliding minute permits clarification dialogue, not unlimited retries.
+// Malformed/unauthorized bodies consume a turn; rejected admission attempts do not.
+const users = new Map<string, number[]>();
+const inFlightUsers = new Set<string>();
 let turns = 0;
 let queries = 0;
 
@@ -129,7 +132,8 @@ export async function handleAiChat(
   request: Request,
   runtime: (input: AiTurn) => ReturnType<typeof runAiTurn> = runAiTurn,
 ) {
-  let admitted = false;
+  let streamOwnsAdmission = false;
+  let releaseAdmission = () => {};
   const cancellation = new AbortController();
   const signal = AbortSignal.any([
     request.signal,
@@ -143,12 +147,29 @@ export async function handleAiChat(
       fail(401, 'Sign in to use AI board assistance.');
     const auth: Auth = { user: authenticated.user };
     const now = Date.now();
-    for (const [id, expires] of users) if (expires <= now) users.delete(id);
-    if (users.has(auth.user.id) || users.size >= 1000 || turns >= AI_LIMITS.concurrency)
+    for (const [id, timestamps] of users) {
+      const recent = timestamps.filter(time => time > now - 60_000);
+      if (recent.length) users.set(id, recent);
+      else users.delete(id);
+    }
+    const recent = users.get(auth.user.id) ?? [];
+    if (
+      inFlightUsers.has(auth.user.id) ||
+      recent.length >= 6 ||
+      (!users.has(auth.user.id) && users.size >= 1000) ||
+      turns >= AI_LIMITS.concurrency
+    )
       fail(429, 'AI is busy. Try again shortly.');
-    users.set(auth.user.id, now + 60_000);
+    users.set(auth.user.id, [...recent, now]);
+    inFlightUsers.add(auth.user.id);
     turns++;
-    admitted = true;
+    let released = false;
+    releaseAdmission = () => {
+      if (released) return;
+      released = true;
+      inFlightUsers.delete(auth.user.id);
+      turns--;
+    };
     const parsed = bodySchema.safeParse(await readBody(request, signal));
     if (!parsed.success) fail(400, 'Invalid AI request.');
     const input = parsed.data;
@@ -357,6 +378,7 @@ export async function handleAiChat(
           const close = () => {
             if (closed) return;
             closed = true;
+            releaseAdmission();
             removeAbort();
             demand?.();
             demand = undefined;
@@ -426,7 +448,6 @@ export async function handleAiChat(
               send({ type: 'error', error: 'AI assistance could not complete. Try again.' });
             })
             .finally(() => {
-              turns--;
               close();
             });
           if (signal.aborted) abort();
@@ -437,6 +458,7 @@ export async function handleAiChat(
         },
         cancel() {
           closed = true;
+          releaseAdmission();
           removeAbort();
           demand?.();
           demand = undefined;
@@ -445,7 +467,7 @@ export async function handleAiChat(
       },
       { highWaterMark: 1 },
     );
-    admitted = false; // Stream lifetime owns admission cleanup now.
+    streamOwnsAdmission = true; // Retain admission through terminal delivery or disconnect.
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -461,6 +483,6 @@ export async function handleAiChat(
       });
     return response(502, { error: 'AI assistance could not complete. Try again.' });
   } finally {
-    if (admitted) turns--;
+    if (!streamOwnsAdmission) releaseAdmission();
   }
 }

@@ -6,6 +6,27 @@ Authentication (session user only), body byte/schema limits, draft validation an
 initial reference authorization run before stream headers. Preflight failures are
 still JSON with their normal status. Responses are not cached.
 
+## Dialogue admission
+
+Admission is process-local staging protection, not a durable or distributed quota.
+An authenticated user may have only one in-flight turn, with at most two turns
+across the process. The in-flight guard is released once on JSON completion or
+failure, SSE terminal delivery, disconnect/cancel, or host deadline. A stream
+waiting for terminal delivery under backpressure still holds admission; no database
+transaction is held during that wait.
+
+Separately, each user may start six admitted turns per sliding 60-second window.
+This fixed burst allows immediate clarification answers after a completed response
+without allowing unlimited retries. A seventh turn or overlapping turn receives
+only the generic JSON 429 busy response before stream headers. Unauthenticated or
+admission-denied requests do not consume a turn; once admitted, malformed bodies,
+scope denials and provider failures do consume one. Rejected attempts do not extend
+the window. The timestamp map holds at most 1,000 users with at most six timestamps
+each; expired timestamps/users are pruned on admission. At capacity, existing users
+can still use their remaining burst, while new users wait for expiry. No prompts,
+credentials, analytics or user IDs are logged for admission, and no database
+migration or persistent per-user limit is introduced.
+
 ## Discovery
 
 `analytics_discover` accepts **only** `{ websiteId, startAt, endAt }`, with Unix
