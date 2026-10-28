@@ -1,0 +1,2131 @@
+{
+  "kind": "frozen-semantic-followup",
+  "model": "cx/gpt-6.1-sol",
+  "reasoning": "medium",
+  "providerConfigFingerprint": "ede0cc75f82a6da46b80a249628f696a13c69425ac2b14e29f0e3deb9483c6ba",
+  "fingerprintExcludesSecretsAndPrivateOrigin": true,
+  "promptHashes": {
+    "baseline": "d908c53d60317ed10a0b0717e2a5949ca9c08e5fb5ab7e214c6fae5fa975bb56",
+    "candidate": "e2794396f9abe3383e379688ddff162cfa4de1444f95a4907f86a6c64b32e8a8"
+  },
+  "rubricHash": "7d0eacbe85c26003f86ae032d1261fcabe4617dd93c92b573e06532265031d1c",
+  "fixtureHash": "e52c28d7b73677fa6ce71598671f523151c22b8049bfa86c7b6b575c61af6584",
+  "runnerHash": "511ee99bd978a9fa4e1154b99d45c888a9ec7d4831e0f5a1f4dcd96be06e7c82",
+  "budget": {
+    "maxSessions": 37,
+    "preflightSessions": 1,
+    "matrixSessions": 36,
+    "maxTools": 8,
+    "deadlineMs": 45000,
+    "retries": 0
+  },
+  "pricingAvailable": false,
+  "semanticJudgment": "pending-independent-blind-review",
+  "trials": [
+    {
+      "reviewId": "a564d8ea74dad419",
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "supported-board",
+      "fixtureHash": "c8a703afc613bdcca2e633832d062d9d808a878315b5f7ceb9d1de2dbc48e961",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": false,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 1,
+      "pass": false,
+      "final": {
+        "message": "Please select a website so I can suggest a simple visits and popular pages board."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4509,
+      "outputTokens": 72,
+      "reportedCost": 0,
+      "seconds": 15.68
+    },
+    {
+      "reviewId": "2e29a6c064dd7512",
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "supported-board",
+      "fixtureHash": "c8a703afc613bdcca2e633832d062d9d808a878315b5f7ceb9d1de2dbc48e961",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Here is a simple visits and popular pages board for the selected website, 11111111-1111-4111-8111-111111111111. The supplied date range is January 1, 2024, 00:00:00–23:59:59.999 UTC. This is a preview only; nothing has been saved.",
+        "draft": {
+          "websiteId": "11111111-1111-4111-8111-111111111111",
+          "rows": [
+            {
+              "id": "overview_row",
+              "columns": [
+                {
+                  "id": "overview_column",
+                  "component": {
+                    "type": "WebsiteMetricsBar",
+                    "title": "Traffic overview"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "trend_row",
+              "columns": [
+                {
+                  "id": "trend_column",
+                  "component": {
+                    "type": "WebsiteChart",
+                    "title": "Traffic over time"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pages_row",
+              "columns": [
+                {
+                  "id": "pages_column",
+                  "component": {
+                    "type": "MetricsTable",
+                    "title": "Popular pages",
+                    "props": {
+                      "type": "path",
+                      "limit": 10
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6936,
+      "outputTokens": 215,
+      "reportedCost": 0,
+      "seconds": 16.683
+    },
+    {
+      "reviewId": "662f95710615559f",
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "missing-website",
+      "fixtureHash": "5238978a77831d055d36608dfdbd64e22d6ee1e89f1bc43b2b30e198fb0157ec",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Please select a website so I can suggest a visits board with traffic metrics, a visits chart, and popular pages. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 9559,
+      "outputTokens": 72,
+      "reportedCost": 0,
+      "seconds": 7.315
+    },
+    {
+      "reviewId": "43627bdf838bb6fc",
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "missing-website",
+      "fixtureHash": "5238978a77831d055d36608dfdbd64e22d6ee1e89f1bc43b2b30e198fb0157ec",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Please select a website so I can suggest a visits analytics board."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4582,
+      "outputTokens": 35,
+      "reportedCost": 0,
+      "seconds": 5.761
+    },
+    {
+      "reviewId": "71829b3679d72ff4",
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "ambiguous-login",
+      "fixtureHash": "d81b900b35b31afaf97622c49acb634eeaf43d6d08318f85265c2239fd845c54",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t build this board with the available analytics tools: they cannot count distinct tracked usernames, report successful logins per username, or read account audit records. Login-page visits would not be a valid substitute for successful authentication. For a future supported integration, which tracked event specifically records successful authentication, and which event property identifies the username? That integration is not currently available here."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6528,
+      "outputTokens": 97,
+      "reportedCost": 0,
+      "seconds": 11.665
+    },
+    {
+      "reviewId": "2546dbbb4e01e43f",
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "ambiguous-login",
+      "fixtureHash": "d81b900b35b31afaf97622c49acb634eeaf43d6d08318f85265c2239fd845c54",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), discovery found events named login and login_page, plus a string property named username on login. These labels do not establish that login records successful authentication; property coverage is unavailable. Your intended meaning is clear: successful authentication, not opening a login page. However, the current tools and board widgets cannot count distinct tracked usernames or group successful-login counts by username. That would require event-property aggregation and a renderer supporting those results, which are future capabilities, not currently available. No draft is provided, and nothing has been saved.",
+        "questions": [
+          {
+            "id": "login_success_semantics",
+            "question": "Is the tracked login event emitted only after successful authentication?",
+            "options": [
+              {
+                "label": "Yes, only after successful authentication",
+                "value": "success_only"
+              },
+              {
+                "label": "No, it also includes other outcomes",
+                "value": "mixed_outcomes"
+              },
+              {
+                "label": "I am not sure",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 9196,
+      "outputTokens": 281,
+      "reportedCost": 0,
+      "seconds": 24.132
+    },
+    {
+      "reviewId": "4fca63da01b12e88",
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "absent-username",
+      "fixtureHash": "51197d2a91f7c2f5d499bd6d6c4510111fccea51e1fa47609393e1bd519f488e",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Using the supplied selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), metadata discovery returned no event or property names, with coverage unavailable. This does not establish whether login tracking exists. The requested board is not supported: counting distinct tracked usernames and successful logins per username requires event-property aggregation and a renderer that the current tools and widgets do not provide. No draft is proposed, and no username values or login records were requested. Those aggregation and rendering capabilities would be future requirements.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "What should qualify as a successful login for this analysis?",
+            "options": [
+              {
+                "label": "Authentication completed successfully",
+                "value": "authentication_completed"
+              },
+              {
+                "label": "A session was created after authentication",
+                "value": "authenticated_session_created"
+              },
+              {
+                "label": "Another definition or not yet determined",
+                "value": "other_or_undetermined"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12003,
+      "outputTokens": 262,
+      "reportedCost": 0,
+      "seconds": 14.879
+    },
+    {
+      "reviewId": "ea36606c10d11e7f",
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "absent-username",
+      "fixtureHash": "51197d2a91f7c2f5d499bd6d6c4510111fccea51e1fa47609393e1bd519f488e",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t count tracked usernames or successful logins per username with the available analytics tools. They do not support reading username values, per-user login counts, event properties, or account audit records, so I can’t suggest a board that accurately shows those figures. For a future supported integration, which tracked event explicitly represents a successful login, and which property contains the username? An event name alone would not establish that a login succeeded."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4455,
+      "outputTokens": 108,
+      "reportedCost": 0,
+      "seconds": 19.274
+    },
+    {
+      "reviewId": "6d6eb64a6d34512e",
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "truncated-metadata",
+      "fixtureHash": "09b63bd640860bb3cf1418114d10ab0b99344885a289c3103be218a12432d3ae",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t report tracked usernames or successful logins per username with the available analytics tools. They do not support reading username property values, counting per-user logins, or accessing account audit records, so I can’t determine whether the required property exists. For a future integration that supports this reporting, which tracked event explicitly represents a successful login, and which property contains the username? This reporting feature is not currently available."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4460,
+      "outputTokens": 105,
+      "reportedCost": 0,
+      "seconds": 17.316
+    },
+    {
+      "reviewId": "719f7adeb818a93e",
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "truncated-metadata",
+      "fixtureHash": "09b63bd640860bb3cf1418114d10ab0b99344885a289c3103be218a12432d3ae",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Using the selected website 11111111-1111-4111-8111-111111111111 and supplied date range, January 1, 2024 (UTC). The bounded metadata includes a login event and a string property named plan. A username property was not found in the returned metadata, but both event and property results are truncated, so this does not establish that it is absent. Coverage is unavailable. The login event name alone does not establish successful authentication. Current tools and board widgets cannot display tracked usernames or aggregate successful logins per username, so no draft is provided. This would require event-property aggregation and a renderer supporting per-username login counts, which are not currently available.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "Does the tracked login event represent successful authentication only, or does it include attempts or failures?",
+            "options": [
+              {
+                "label": "Successful authentication only",
+                "value": "success_only"
+              },
+              {
+                "label": "Includes attempts or failures",
+                "value": "includes_attempts_or_failures"
+              },
+              {
+                "label": "Not sure",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 9172,
+      "outputTokens": 288,
+      "reportedCost": 0,
+      "seconds": 13.423
+    },
+    {
+      "reviewId": "ad1932f23a5d924f",
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "unsupported-refinement",
+      "fixtureHash": "321e3605ef0f885ad4fab65156251057c8cacf157f209f5bcbea7ca1a2bb100d",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "For selected website 11111111-1111-4111-8111-111111111111 and the supplied January 1, 2024 UTC date range, discovery found a login event with 12 occurrences and a string username property. This does not establish that those events represent successful logins; property coverage is unavailable. Grouping successful logins by username is not supported by the current tools or board widgets. It would require event-property aggregation and a renderer that supports those grouped counts. I cannot provide the requested chart replacement, and your existing board remains unchanged; nothing has been saved.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "Is the tracked login event emitted only after successful authentication, or can it also represent attempts or failures?",
+            "options": [
+              {
+                "label": "Successful authentication only",
+                "value": "success_only"
+              },
+              {
+                "label": "May include attempts or failures",
+                "value": "includes_other_outcomes"
+              },
+              {
+                "label": "Unknown",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11960,
+      "outputTokens": 267,
+      "reportedCost": 0,
+      "seconds": 18.686
+    },
+    {
+      "reviewId": "e990d976f912902a",
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "unsupported-refinement",
+      "fixtureHash": "321e3605ef0f885ad4fab65156251057c8cacf157f209f5bcbea7ca1a2bb100d",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t change the chart to group successful logins by username. The available analytics tools cannot read username values, count per-user logins, or group events by event properties, so I won’t substitute pageviews or suggest an unsupported widget. Your existing board has not been changed. For a future supported integration, which tracked event represents a confirmed successful login, and which event property contains the username? That integration is not currently available."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4564,
+      "outputTokens": 109,
+      "reportedCost": 0,
+      "seconds": 12.935
+    },
+    {
+      "reviewId": "23e99de3b1cce7a1",
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "supported-board",
+      "fixtureHash": "c8a703afc613bdcca2e633832d062d9d808a878315b5f7ceb9d1de2dbc48e961",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Here is a simple board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). It includes traffic metrics, a traffic trend, and the top 10 page paths. Nothing has been saved; review the preview and select Save to keep it.",
+        "draft": {
+          "websiteId": "11111111-1111-4111-8111-111111111111",
+          "rows": [
+            {
+              "id": "overview_row",
+              "columns": [
+                {
+                  "id": "overview_column",
+                  "component": {
+                    "type": "WebsiteMetricsBar",
+                    "title": "Traffic overview"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "trend_row",
+              "columns": [
+                {
+                  "id": "trend_column",
+                  "component": {
+                    "type": "WebsiteChart",
+                    "title": "Traffic trend"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pages_row",
+              "columns": [
+                {
+                  "id": "pages_column",
+                  "component": {
+                    "type": "MetricsTable",
+                    "title": "Popular pages",
+                    "props": {
+                      "type": "path",
+                      "limit": 10
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6940,
+      "outputTokens": 219,
+      "reportedCost": 0,
+      "seconds": 11.303
+    },
+    {
+      "reviewId": "3770a3ca7eb85acf",
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "supported-board",
+      "fixtureHash": "c8a703afc613bdcca2e633832d062d9d808a878315b5f7ceb9d1de2dbc48e961",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": false,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 1,
+      "pass": false,
+      "final": {
+        "message": "Please select a website so I can suggest a simple visits and popular pages board."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4637,
+      "outputTokens": 72,
+      "reportedCost": 0,
+      "seconds": 7.865
+    },
+    {
+      "reviewId": "c74f34a9e39bd765",
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "missing-website",
+      "fixtureHash": "5238978a77831d055d36608dfdbd64e22d6ee1e89f1bc43b2b30e198fb0157ec",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Please select a website so I can suggest a visits analytics board."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4580,
+      "outputTokens": 35,
+      "reportedCost": 0,
+      "seconds": 5.638
+    },
+    {
+      "reviewId": "d1c205efc8c2dae8",
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "missing-website",
+      "fixtureHash": "5238978a77831d055d36608dfdbd64e22d6ee1e89f1bc43b2b30e198fb0157ec",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6988,
+      "outputTokens": 61,
+      "reportedCost": 0,
+      "seconds": 6.085
+    },
+    {
+      "reviewId": "4fe9e6112474a52b",
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "ambiguous-login",
+      "fixtureHash": "d81b900b35b31afaf97622c49acb634eeaf43d6d08318f85265c2239fd845c54",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), metadata lists login (12 events), login_page (12 events), and a string username property on login. These labels and counts do not establish successful authentication or the number of distinct tracked usernames; property coverage is unavailable.\n\nThe requested chart is not supported by the current tools or board widgets. It would require distinct-username aggregation and successful-login counts grouped by username, plus a renderer for those results. No draft is included, and nothing has been saved.",
+        "questions": [
+          {
+            "id": "successful_login_semantics",
+            "question": "You mean successful authentication. Is the tracked login event emitted only after authentication succeeds?",
+            "options": [
+              {
+                "label": "Yes, only after successful authentication",
+                "value": "success_only"
+              },
+              {
+                "label": "No, it also includes unsuccessful attempts or other activity",
+                "value": "mixed_activity"
+              },
+              {
+                "label": "I’m not sure",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11880,
+      "outputTokens": 277,
+      "reportedCost": 0,
+      "seconds": 14.154
+    },
+    {
+      "reviewId": "801c5f3c85e186ac",
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "ambiguous-login",
+      "fixtureHash": "d81b900b35b31afaf97622c49acb634eeaf43d6d08318f85265c2239fd845c54",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t build this board with the available analytics tools: they cannot count tracked usernames or report successful logins per user, and login-page visits are not evidence of successful authentication. A future supported integration would need a tracked event that explicitly records successful authentication and a username property associated with that event. Which tracked event and username property would provide those data? Please share only the event and property names, not actual usernames."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4742,
+      "outputTokens": 105,
+      "reportedCost": 0,
+      "seconds": 8.859
+    },
+    {
+      "reviewId": "d56d5167e9c49e86",
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "absent-username",
+      "fixtureHash": "51197d2a91f7c2f5d499bd6d6c4510111fccea51e1fa47609393e1bd519f488e",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t build a board showing tracked username totals or successful login counts per username with the available analytics tools. They do not support username counts, per-user login aggregation, or account audit records, and website visits are not a substitute. For a future supported integration, which tracked event represents a confirmed successful login, and which event property contains the username? This board capability is not currently available."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4701,
+      "outputTokens": 100,
+      "reportedCost": 0,
+      "seconds": 8.407
+    },
+    {
+      "reviewId": "f9cd3ed6f092138b",
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "absent-username",
+      "fixtureHash": "51197d2a91f7c2f5d499bd6d6c4510111fccea51e1fa47609393e1bd519f488e",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Using the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC). Discovery returned no event or property metadata for this period, with coverage unavailable, so I cannot establish what represents a tracked username or a successful login. This does not establish that tracking is absent.\n\nThe current tools and board widgets cannot count distinct usernames or group successful login counts by username. This requires event-property aggregation and a renderer that supports per-username results; neither is currently available. No draft is provided, and traffic metrics would not fulfill this request.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "What should qualify as a successful login for this analysis?",
+            "options": [
+              {
+                "label": "Authentication completed successfully",
+                "value": "Authentication completed successfully"
+              },
+              {
+                "label": "A session was created after authentication",
+                "value": "A session was created after authentication"
+              },
+              {
+                "label": "Another explicitly defined success condition",
+                "value": "Another explicitly defined success condition"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12019,
+      "outputTokens": 275,
+      "reportedCost": 0,
+      "seconds": 13.027
+    },
+    {
+      "reviewId": "8837607c3b0ff2f9",
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "truncated-metadata",
+      "fixtureHash": "09b63bd640860bb3cf1418114d10ab0b99344885a289c3103be218a12432d3ae",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Using the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC). The bounded metadata includes an event named login and a string property named plan associated with it. A username property was not found in the returned metadata, but both event and property results are truncated, so this does not establish that one is absent. Property coverage is unavailable. The event name alone does not establish successful authentication. This board builder cannot display tracked usernames or successful-login counts grouped by username. That would require event-property aggregation and a renderer supporting that grouping, neither of which is currently available. No draft was created.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "Does the tracked login event represent only successful authentications, or does it also include failed attempts?",
+            "options": [
+              {
+                "label": "Successful authentications only",
+                "value": "success_only"
+              },
+              {
+                "label": "Includes failed attempts",
+                "value": "includes_failures"
+              },
+              {
+                "label": "Not sure",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11856,
+      "outputTokens": 281,
+      "reportedCost": 0,
+      "seconds": 13.539
+    },
+    {
+      "reviewId": "278d5f8a01e5513f",
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "truncated-metadata",
+      "fixtureHash": "09b63bd640860bb3cf1418114d10ab0b99344885a289c3103be218a12432d3ae",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t create a board showing tracked usernames or successful logins per username. The available analytics tools cannot read username values, count per-user logins, or access account audit records, so I cannot verify whether the username property exists. For a future supported integration, which tracked event represents a confirmed successful login, and which property contains the username? Event names alone do not establish that a login succeeded."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4715,
+      "outputTokens": 173,
+      "reportedCost": 0,
+      "seconds": 12.381
+    },
+    {
+      "reviewId": "e6ecad2326851b8b",
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "unsupported-refinement",
+      "fixtureHash": "321e3605ef0f885ad4fab65156251057c8cacf157f209f5bcbea7ca1a2bb100d",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t change the chart to group successful logins by username. The available analytics tools do not support per-user login counts, username-property grouping, or account audit records, and pageviews are not a substitute. No board changes have been made. For a future integration that supports this, which tracked event explicitly represents a successful login, and which event property contains the username?"
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6598,
+      "outputTokens": 97,
+      "reportedCost": 0,
+      "seconds": 6.82
+    },
+    {
+      "reviewId": "0c243897437d51f5",
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "unsupported-refinement",
+      "fixtureHash": "321e3605ef0f885ad4fab65156251057c8cacf157f209f5bcbea7ca1a2bb100d",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "The selected website is 11111111-1111-4111-8111-111111111111, with the supplied date range January 1, 2024 (UTC). Metadata lists a login event and a string username property, but does not establish whether login means successful authentication. Grouping successful logins by username is not supported by the current reads or board widgets; it would require event-property aggregation and a renderer that supports it. I cannot make that chart change, so no revised draft is provided. Your existing board remains unchanged; nothing has been saved.",
+        "questions": [
+          {
+            "id": "login_success_meaning",
+            "question": "Does the tracked login event represent only successful authentication?",
+            "options": [
+              {
+                "label": "Yes, successful authentication only",
+                "value": "success_only"
+              },
+              {
+                "label": "No, it includes unsuccessful attempts",
+                "value": "includes_unsuccessful"
+              },
+              {
+                "label": "Not sure",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 9261,
+      "outputTokens": 256,
+      "reportedCost": 0,
+      "seconds": 11.987
+    },
+    {
+      "reviewId": "93618979c2b6fdf4",
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "supported-board",
+      "fixtureHash": "c8a703afc613bdcca2e633832d062d9d808a878315b5f7ceb9d1de2dbc48e961",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": false,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 1,
+      "pass": false,
+      "final": {
+        "message": "Please select a website so I can suggest a simple visits and popular pages board."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4507,
+      "outputTokens": 73,
+      "reportedCost": 0,
+      "seconds": 7.37
+    },
+    {
+      "reviewId": "6f61d0b3665c2433",
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "supported-board",
+      "fixtureHash": "c8a703afc613bdcca2e633832d062d9d808a878315b5f7ceb9d1de2dbc48e961",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Here is a simple visits and popular pages board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). Nothing has been saved; review the preview and select Save to keep it.",
+        "draft": {
+          "websiteId": "11111111-1111-4111-8111-111111111111",
+          "rows": [
+            {
+              "id": "overview_row",
+              "columns": [
+                {
+                  "id": "overview_column",
+                  "component": {
+                    "type": "WebsiteMetricsBar",
+                    "title": "Traffic overview"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "trend_row",
+              "columns": [
+                {
+                  "id": "trend_column",
+                  "component": {
+                    "type": "WebsiteChart",
+                    "title": "Traffic over time"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pages_row",
+              "columns": [
+                {
+                  "id": "pages_column",
+                  "component": {
+                    "type": "MetricsTable",
+                    "title": "Popular pages",
+                    "props": {
+                      "type": "path",
+                      "limit": 10
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6928,
+      "outputTokens": 207,
+      "reportedCost": 0,
+      "seconds": 8.81
+    },
+    {
+      "reviewId": "71dca14fdc167e05",
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "missing-website",
+      "fixtureHash": "5238978a77831d055d36608dfdbd64e22d6ee1e89f1bc43b2b30e198fb0157ec",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No draft has been created or saved."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 9544,
+      "outputTokens": 57,
+      "reportedCost": 0,
+      "seconds": 6.133
+    },
+    {
+      "reviewId": "e4f1cd6e7144aab0",
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "missing-website",
+      "fixtureHash": "5238978a77831d055d36608dfdbd64e22d6ee1e89f1bc43b2b30e198fb0157ec",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "Please select a website so I can suggest a visits analytics board."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4454,
+      "outputTokens": 35,
+      "reportedCost": 0,
+      "seconds": 7.991
+    },
+    {
+      "reviewId": "b7b3f2e43ac78010",
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "ambiguous-login",
+      "fixtureHash": "d81b900b35b31afaf97622c49acb634eeaf43d6d08318f85265c2239fd845c54",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t build a board showing tracked username counts or successful logins per username with the available analytics tools. They cannot count usernames, per-user logins, event-property values, or account audit records, and login-page visits are not evidence of successful authentication. For a future supported integration, which tracked event records confirmed successful authentication, and which property on that event contains the username? This integration is not currently available."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6792,
+      "outputTokens": 105,
+      "reportedCost": 0,
+      "seconds": 7.043
+    },
+    {
+      "reviewId": "36c90baa81ceafcc",
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "ambiguous-login",
+      "fixtureHash": "d81b900b35b31afaf97622c49acb634eeaf43d6d08318f85265c2239fd845c54",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), discovery found a login event with 12 occurrences and a string property named username, plus a login_page event with 12 occurrences. These counts do not establish successful authentications or distinct usernames; property coverage is unavailable. Your intended meaning is clear: successful authentication, not login-page visits. However, the login event name alone does not confirm that it tracks success. The current tools and board widgets cannot count distinct usernames or group successful logins by username, so I cannot provide this chart or a draft. Supporting it would require event-property aggregation for distinct usernames and per-username successful-login counts, plus a renderer for those results.",
+        "questions": [
+          {
+            "id": "login_success_semantics",
+            "question": "Is the discovered login event emitted only after successful authentication?",
+            "options": [
+              {
+                "label": "Yes, only after successful authentication",
+                "value": "success_only"
+              },
+              {
+                "label": "No, it also includes unsuccessful attempts or other actions",
+                "value": "mixed_outcomes"
+              },
+              {
+                "label": "I do not know",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12165,
+      "outputTokens": 306,
+      "reportedCost": 0,
+      "seconds": 14.316
+    },
+    {
+      "reviewId": "330e89e404d1110f",
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "absent-username",
+      "fixtureHash": "51197d2a91f7c2f5d499bd6d6c4510111fccea51e1fa47609393e1bd519f488e",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "This board cannot currently be created: supported widgets cannot count distinct tracked usernames or group successful-login counts by username. It would require event-property aggregation and a renderer for those results; neither is currently supported. No draft has been created, and traffic metrics have not been substituted.\n\nUsing the supplied selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024, 00:00:00–23:59:59.999 UTC, discovery returned no event or property metadata, with coverage reported as unavailable. This does not establish that tracking is absent.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "What should qualify as a successful login for the intended report?",
+            "options": [
+              {
+                "label": "An authentication confirmed successful by the application",
+                "value": "application_confirmed_success"
+              },
+              {
+                "label": "A tracked login interaction, regardless of authentication outcome",
+                "value": "login_interaction"
+              },
+              {
+                "label": "The definition is not yet established",
+                "value": "not_established"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11767,
+      "outputTokens": 300,
+      "reportedCost": 0,
+      "seconds": 12.913
+    },
+    {
+      "reviewId": "6c9afabdb8595579",
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "absent-username",
+      "fixtureHash": "51197d2a91f7c2f5d499bd6d6c4510111fccea51e1fa47609393e1bd519f488e",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t build a board showing tracked username totals or successful login counts per username with the current analytics tools. They cannot read username values, per-user login counts, event properties, or account audit records, and website traffic is not a substitute. For a future supported integration, which tracked event explicitly represents a successful login, and which event property contains the username? This integration is not currently available."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4702,
+      "outputTokens": 101,
+      "reportedCost": 0,
+      "seconds": 7.748
+    },
+    {
+      "reviewId": "d776460295948434",
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "truncated-metadata",
+      "fixtureHash": "09b63bd640860bb3cf1418114d10ab0b99344885a289c3103be218a12432d3ae",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t report tracked usernames or successful logins per username with the available analytics tools. They cannot read username property values, count per-user logins, or access account audit records, so I can’t determine whether the needed property exists. For a future supported integration, which tracked event explicitly records a successful login, and which property contains the username? This reporting capability is not currently available."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4713,
+      "outputTokens": 100,
+      "reportedCost": 0,
+      "seconds": 7.896
+    },
+    {
+      "reviewId": "d3959f68945fe4e0",
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "truncated-metadata",
+      "fixtureHash": "09b63bd640860bb3cf1418114d10ab0b99344885a289c3103be218a12432d3ae",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), the bounded metadata includes a login event and a string property named plan. A username property was not found in the returned result, but both event and property results are truncated, so this does not establish that it is absent. Coverage information is unavailable. The login event name alone does not establish successful authentication. Current tools and widgets cannot retrieve usernames or aggregate successful logins per username, so no draft is provided. That board would require future event-property aggregation and a compatible renderer.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "Does the tracked login event fire only after successful authentication, or does it also include unsuccessful attempts?",
+            "options": [
+              {
+                "label": "Only after successful authentication",
+                "value": "success_only"
+              },
+              {
+                "label": "Also includes unsuccessful attempts",
+                "value": "includes_attempts"
+              },
+              {
+                "label": "Unknown",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 9159,
+      "outputTokens": 272,
+      "reportedCost": 0,
+      "seconds": 14.762
+    },
+    {
+      "reviewId": "a0c19fd97aa13488",
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "unsupported-refinement",
+      "fixtureHash": "321e3605ef0f885ad4fab65156251057c8cacf157f209f5bcbea7ca1a2bb100d",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "final": {
+        "message": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), discovery found an event named login (12 occurrences) and a string property named username. These labels do not establish that the events represent successful logins. Grouping successful logins by username requires event-property aggregation and a renderer that supports it; neither is currently available. I cannot provide that chart change, so no revised draft is included and your existing board remains unchanged. A traffic chart would not fulfill this request.",
+        "questions": [
+          {
+            "id": "successful_login_meaning",
+            "question": "Does the tracked login event fire only after successful authentication, or can it also represent attempts or failures?",
+            "options": [
+              {
+                "label": "Only after successful authentication",
+                "value": "success_only"
+              },
+              {
+                "label": "Also includes attempts or failures",
+                "value": "mixed_outcomes"
+              },
+              {
+                "label": "Not sure",
+                "value": "unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12215,
+      "outputTokens": 263,
+      "reportedCost": 0,
+      "seconds": 14.567
+    },
+    {
+      "reviewId": "df31241c4d06876c",
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "unsupported-refinement",
+      "fixtureHash": "321e3605ef0f885ad4fab65156251057c8cacf157f209f5bcbea7ca1a2bb100d",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "final": {
+        "message": "I can’t change the chart to group successful logins by username with the supported analytics tools. They cannot read username values or calculate per-user login counts, and pageviews are not a substitute. I haven’t changed your existing board. For a future integration, which tracked event represents a confirmed successful login, and which event property contains the username? That integration is not currently supported."
+      },
+      "evidenceGap": null,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4551,
+      "outputTokens": 98,
+      "reportedCost": 0,
+      "seconds": 11.377
+    }
+  ],
+  "notExecuted": 0,
+  "preflight": {
+    "checks": {
+      "proposal": true,
+      "discoveryFirst": true,
+      "correctDraftPresence": true,
+      "semanticClarification": true,
+      "capabilityHonesty": true,
+      "noAbsenceOverclaim": true,
+      "noUnsafeValueRequest": true,
+      "boundedQuestions": true,
+      "noUnnecessaryQuestions": true,
+      "missingWebsiteNoReads": true
+    },
+    "questionCount": 0,
+    "semanticQuestion": false,
+    "unsupported": false,
+    "unsafeValueRequest": false,
+    "unnecessaryQuestions": 0,
+    "hallucinatedWidget": 0,
+    "pass": true,
+    "final": {
+      "message": "Here is a simple visits and popular pages board for the selected website (11111111-1111-4111-8111-111111111111), using the supplied date range of January 1, 2024, 00:00:00–23:59:59.999 UTC. This is a preview only; save it explicitly to keep it.",
+      "draft": {
+        "websiteId": "11111111-1111-4111-8111-111111111111",
+        "rows": [
+          {
+            "id": "row_overview",
+            "columns": [
+              {
+                "id": "col_metrics",
+                "component": {
+                  "type": "WebsiteMetricsBar",
+                  "title": "Traffic overview"
+                }
+              }
+            ]
+          },
+          {
+            "id": "row_trend",
+            "columns": [
+              {
+                "id": "col_trend",
+                "component": {
+                  "type": "WebsiteChart",
+                  "title": "Traffic over time"
+                }
+              }
+            ]
+          },
+          {
+            "id": "row_pages",
+            "columns": [
+              {
+                "id": "col_pages",
+                "component": {
+                  "type": "MetricsTable",
+                  "title": "Popular pages",
+                  "props": {
+                    "type": "path",
+                    "limit": 10
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "evidenceGap": null,
+    "failure": null,
+    "providerCategory": null,
+    "sequence": [
+      "propose_board"
+    ],
+    "nativeEvents": [
+      "propose_board"
+    ],
+    "invalidArgs": 0,
+    "forbiddenReads": 0,
+    "modelCalls": 2,
+    "inputTokens": 6941,
+    "outputTokens": 220,
+    "reportedCost": 0,
+    "seconds": 8.194
+  }
+}

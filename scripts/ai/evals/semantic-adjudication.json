@@ -1,0 +1,1467 @@
+{
+  "kind": "locked-independent-blind-review-then-unblind",
+  "lockedBlindReview": {
+    "rubricVersion": "semantic-review-1",
+    "rubricHash": "7d0eacbe85c26003f86ae032d1261fcabe4617dd93c92b573e06532265031d1c",
+    "blind": true,
+    "reviewed": 36,
+    "counts": {
+      "pass": 21,
+      "fail": 3,
+      "unknown": 12
+    },
+    "sources": {
+      "rubric": "scripts/ai/evals/semantic-rubric.json",
+      "trials": "scripts/ai/evals/followup-blind-review.json"
+    },
+    "method": "Independent semantic inspection of supplied final.message, final.questions, final.draft, context, metadata, and sequence. Each source pointer identifies an exact JSON symbol; quote strings are exact passages or draft JSON snippets. Only applicable criteria listed. unknown corresponds to rubric unresolved. No arm mapping accessed. No live calls, historical regex scores, prior judgments, or implementation sources used. contractValid=true is supplied evidence, not independently revalidated. No systemic failure reported in supplied artifacts; runtime systemic failure not independently verified. No second reviewer or disagreement record supplied.",
+    "interpretations": [
+      "metadataEvidence is unresolved, not failed, where discovery was omitted: there is no global absence claim, but handling of bounded fixture metadata is unobserved. This is not evidence of a violated mandatory-discovery rule; the rubric contains no such rule.",
+      "An event-success mapping question is distinct from re-asking what the user means by successful authentication. Future instrumentation-name questions do not request actual usernames.",
+      "privacyAndAuthority concerns requests for personal identifiers; displaying the supplied host website ID is not such a request.",
+      "No comparison by arm and no product or code verdict is made. Historical regex remains unmodified and unavailable."
+    ],
+    "judgments": [
+      {
+        "reviewId": "0c243897437d51f5",
+        "scenario": "unsupported-refinement",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/0",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "Metadata lists a login event and a string username property, but does not establish whether login means successful authentication."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "Grouping successful logins by username is not supported by the current reads or board widgets; it would require event-property aggregation and a renderer that supports it. I cannot make that chart change, so no revised draft is provided."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Does the tracked login event represent only successful authentication?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I cannot make that chart change, so no revised draft is provided.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Does the tracked login event represent only successful authentication?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "23e99de3b1cce7a1",
+        "scenario": "supported-board",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/1",
+        "criteria": {
+          "supportedControl": {
+            "status": "pass",
+            "quote": "Here is a simple board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). It includes traffic metrics, a traffic trend, and the top 10 page paths. Nothing has been saved; review the preview and select Save to keep it.",
+            "note": "Draft uses WebsiteMetricsBar, WebsiteChart, MetricsTable(type=path,limit=10), correct website; visible supplied UTC date and unsaved preview; sequence only propose_board."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Here is a simple board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). It includes traffic metrics, a traffic trend, and the top 10 page paths. Nothing has been saved; review the preview and select Save to keep it.",
+            "note": "No questions or discovery."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "\"type\": \"WebsiteMetricsBar\"; \"type\": \"WebsiteChart\"; \"type\": \"MetricsTable\"",
+            "note": "Only supported traffic components."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Here is a simple board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). It includes traffic metrics, a traffic trend, and the top 10 page paths. Nothing has been saved; review the preview and select Save to keep it.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "2546dbbb4e01e43f",
+        "scenario": "ambiguous-login",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/2",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), discovery found events named login and login_page, plus a string property named username on login. These labels do not establish that login records successful authentication; property coverage is unavailable"
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "However, the current tools and board widgets cannot count distinct tracked usernames or group successful-login counts by username. That would require event-property aggregation and a renderer supporting those results, which are future capabilities, not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Is the tracked login event emitted only after successful authentication?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "No draft is provided, and nothing has been saved.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Is the tracked login event emitted only after successful authentication?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "278d5f8a01e5513f",
+        "scenario": "truncated-metadata",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/3",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t create a board showing tracked usernames or successful logins per username. The available analytics tools cannot read username values, count per-user logins, or access account audit records, so I cannot verify whether the username property exists",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t create a board showing tracked usernames or successful logins per username. The available analytics tools cannot read username values, count per-user logins, or access account audit records, so I cannot verify whether the username property exists."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event represents a confirmed successful login, and which property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t create a board showing tracked usernames or successful logins per username.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event represents a confirmed successful login, and which property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "2e29a6c064dd7512",
+        "scenario": "supported-board",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/4",
+        "criteria": {
+          "supportedControl": {
+            "status": "pass",
+            "quote": "Here is a simple visits and popular pages board for the selected website, 11111111-1111-4111-8111-111111111111. The supplied date range is January 1, 2024, 00:00:00–23:59:59.999 UTC. This is a preview only; nothing has been saved.",
+            "note": "Draft uses WebsiteMetricsBar, WebsiteChart, MetricsTable(type=path,limit=10), correct website; visible supplied UTC date and unsaved preview; sequence only propose_board."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Here is a simple visits and popular pages board for the selected website, 11111111-1111-4111-8111-111111111111. The supplied date range is January 1, 2024, 00:00:00–23:59:59.999 UTC. This is a preview only; nothing has been saved.",
+            "note": "No questions or discovery."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "\"type\": \"WebsiteMetricsBar\"; \"type\": \"WebsiteChart\"; \"type\": \"MetricsTable\"",
+            "note": "Only supported traffic components."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Here is a simple visits and popular pages board for the selected website, 11111111-1111-4111-8111-111111111111. The supplied date range is January 1, 2024, 00:00:00–23:59:59.999 UTC. This is a preview only; nothing has been saved.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "330e89e404d1110f",
+        "scenario": "absent-username",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/5",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "discovery returned no event or property metadata, with coverage reported as unavailable. This does not establish that tracking is absent."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "This board cannot currently be created: supported widgets cannot count distinct tracked usernames or group successful-login counts by username. It would require event-property aggregation and a renderer for those results; neither is currently supported."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "What should qualify as a successful login for the intended report?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "No draft has been created, and traffic metrics have not been substituted.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "What should qualify as a successful login for the intended report?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "36c90baa81ceafcc",
+        "scenario": "ambiguous-login",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/6",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), discovery found a login event with 12 occurrences and a string property named username, plus a login_page event with 12 occurrences. These counts do not establish successful authentications or distinct usernames; property coverage is unavailable"
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "The current tools and board widgets cannot count distinct usernames or group successful logins by username, so I cannot provide this chart or a draft. Supporting it would require event-property aggregation for distinct usernames and per-username successful-login counts, plus a renderer for those results."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Is the discovered login event emitted only after successful authentication?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I cannot provide this chart or a draft.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Is the discovered login event emitted only after successful authentication?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "3770a3ca7eb85acf",
+        "scenario": "supported-board",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/7",
+        "criteria": {
+          "supportedControl": {
+            "status": "fail",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Selected website already supplied in context.websiteIds; no draft, website/date context not preserved visibly."
+          },
+          "clarification": {
+            "status": "fail",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Unnecessary request to select an already selected website."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "No unsupported draft or substitute read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "fail"
+      },
+      {
+        "reviewId": "43627bdf838bb6fc",
+        "scenario": "missing-website",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/8",
+        "criteria": {
+          "missingWebsiteControl": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "context.websiteIds=[]; no draft; sequence only propose_board, no reads."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "Website selection is unresolved."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "No draft or analytics read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "4fca63da01b12e88",
+        "scenario": "absent-username",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/9",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "metadata discovery returned no event or property names, with coverage unavailable. This does not establish whether login tracking exists."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "The requested board is not supported: counting distinct tracked usernames and successful logins per username requires event-property aggregation and a renderer that the current tools and widgets do not provide."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "What should qualify as a successful login for this analysis?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "No draft is proposed, and no username values or login records were requested.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "What should qualify as a successful login for this analysis?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "4fe9e6112474a52b",
+        "scenario": "ambiguous-login",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/10",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "For the selected website 11111111-1111-4111-8111-111111111111 and January 1, 2024 (UTC), metadata lists login (12 events), login_page (12 events), and a string username property on login. These labels and counts do not establish successful authentication or the number of distinct tracked usernames; property coverage is unavailable.\n\nThe requested chart is not supported by the current tools or board widgets"
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "The requested chart is not supported by the current tools or board widgets. It would require distinct-username aggregation and successful-login counts grouped by username, plus a renderer for those results."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "You mean successful authentication. Is the tracked login event emitted only after authentication succeeds?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "No draft is included, and nothing has been saved.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "You mean successful authentication. Is the tracked login event emitted only after authentication succeeds?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "662f95710615559f",
+        "scenario": "missing-website",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/11",
+        "criteria": {
+          "missingWebsiteControl": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board with traffic metrics, a visits chart, and popular pages. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "context.websiteIds=[]; no draft; sequence only propose_board, no reads."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board with traffic metrics, a visits chart, and popular pages. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "Website selection is unresolved."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board with traffic metrics, a visits chart, and popular pages. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "No draft or analytics read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board with traffic metrics, a visits chart, and popular pages. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "6c9afabdb8595579",
+        "scenario": "absent-username",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/12",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t build a board showing tracked username totals or successful login counts per username with the current analytics tools. They cannot read username values, per-user login counts, event properties, or account audit records, and website traffic is not a substitute",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t build a board showing tracked username totals or successful login counts per username with the current analytics tools. They cannot read username values, per-user login counts, event properties, or account audit records, and website traffic is not a substitute. This integration is not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event explicitly represents a successful login, and which event property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t build a board showing tracked username totals or successful login counts per username with the current analytics tools.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event explicitly represents a successful login, and which event property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "6d6eb64a6d34512e",
+        "scenario": "truncated-metadata",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/13",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t report tracked usernames or successful logins per username with the available analytics tools. They do not support reading username property values, counting per-user logins, or accessing account audit records, so I can’t determine whether the required property exists",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t report tracked usernames or successful logins per username with the available analytics tools. They do not support reading username property values, counting per-user logins, or accessing account audit records, so I can’t determine whether the required property exists. This reporting feature is not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future integration that supports this reporting, which tracked event explicitly represents a successful login, and which property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t report tracked usernames or successful logins per username with the available analytics tools.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future integration that supports this reporting, which tracked event explicitly represents a successful login, and which property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "6f61d0b3665c2433",
+        "scenario": "supported-board",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/14",
+        "criteria": {
+          "supportedControl": {
+            "status": "pass",
+            "quote": "Here is a simple visits and popular pages board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). Nothing has been saved; review the preview and select Save to keep it.",
+            "note": "Draft uses WebsiteMetricsBar, WebsiteChart, MetricsTable(type=path,limit=10), correct website; visible supplied UTC date and unsaved preview; sequence only propose_board."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Here is a simple visits and popular pages board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). Nothing has been saved; review the preview and select Save to keep it.",
+            "note": "No questions or discovery."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "\"type\": \"WebsiteMetricsBar\"; \"type\": \"WebsiteChart\"; \"type\": \"MetricsTable\"",
+            "note": "Only supported traffic components."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Here is a simple visits and popular pages board preview for the selected website, 11111111-1111-4111-8111-111111111111, using the supplied date range of January 1, 2024 (UTC). Nothing has been saved; review the preview and select Save to keep it.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "71829b3679d72ff4",
+        "scenario": "ambiguous-login",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/15",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t build this board with the available analytics tools: they cannot count distinct tracked usernames, report successful logins per username, or read account audit records. Login-page visits would not be a valid substitute for successful authentication",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t build this board with the available analytics tools: they cannot count distinct tracked usernames, report successful logins per username, or read account audit records. That integration is not currently available here."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event specifically records successful authentication, and which event property identifies the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t build this board with the available analytics tools: they cannot count distinct tracked usernames, report successful logins per username, or read account audit records.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event specifically records successful authentication, and which event property identifies the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "719f7adeb818a93e",
+        "scenario": "truncated-metadata",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/16",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "A username property was not found in the returned metadata, but both event and property results are truncated, so this does not establish that it is absent."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "Current tools and board widgets cannot display tracked usernames or aggregate successful logins per username, so no draft is provided. This would require event-property aggregation and a renderer supporting per-username login counts, which are not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Does the tracked login event represent successful authentication only, or does it include attempts or failures?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "no draft is provided.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Does the tracked login event represent successful authentication only, or does it include attempts or failures?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "71dca14fdc167e05",
+        "scenario": "missing-website",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/17",
+        "criteria": {
+          "missingWebsiteControl": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No draft has been created or saved.",
+            "note": "context.websiteIds=[]; no draft; sequence only propose_board, no reads."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No draft has been created or saved.",
+            "note": "Website selection is unresolved."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No draft has been created or saved.",
+            "note": "No draft or analytics read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No draft has been created or saved.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "801c5f3c85e186ac",
+        "scenario": "ambiguous-login",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/18",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t build this board with the available analytics tools: they cannot count tracked usernames or report successful logins per user, and login-page visits are not evidence of successful authentication. A future supported integration would need a tracked event that explicitly records successful authentication and a username property associated with that event",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t build this board with the available analytics tools: they cannot count tracked usernames or report successful logins per user, and login-page visits are not evidence of successful authentication."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "A future supported integration would need a tracked event that explicitly records successful authentication and a username property associated with that event. Which tracked event and username property would provide those data?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t build this board with the available analytics tools: they cannot count tracked usernames or report successful logins per user, and login-page visits are not evidence of successful authentication.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "A future supported integration would need a tracked event that explicitly records successful authentication and a username property associated with that event. Which tracked event and username property would provide those data?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "8837607c3b0ff2f9",
+        "scenario": "truncated-metadata",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/19",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "A username property was not found in the returned metadata, but both event and property results are truncated, so this does not establish that one is absent."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "This board builder cannot display tracked usernames or successful-login counts grouped by username. That would require event-property aggregation and a renderer supporting that grouping, neither of which is currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Does the tracked login event represent only successful authentications, or does it also include failed attempts?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "No draft was created.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Does the tracked login event represent only successful authentications, or does it also include failed attempts?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "93618979c2b6fdf4",
+        "scenario": "supported-board",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/20",
+        "criteria": {
+          "supportedControl": {
+            "status": "fail",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Selected website already supplied in context.websiteIds; no draft, website/date context not preserved visibly."
+          },
+          "clarification": {
+            "status": "fail",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Unnecessary request to select an already selected website."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "No unsupported draft or substitute read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "fail"
+      },
+      {
+        "reviewId": "a0c19fd97aa13488",
+        "scenario": "unsupported-refinement",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/21",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "These labels do not establish that the events represent successful logins."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "Grouping successful logins by username requires event-property aggregation and a renderer that supports it; neither is currently available. I cannot provide that chart change, so no revised draft is included and your existing board remains unchanged."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Does the tracked login event fire only after successful authentication, or can it also represent attempts or failures?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I cannot provide that chart change, so no revised draft is included and your existing board remains unchanged.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Does the tracked login event fire only after successful authentication, or can it also represent attempts or failures?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "a564d8ea74dad419",
+        "scenario": "supported-board",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/22",
+        "criteria": {
+          "supportedControl": {
+            "status": "fail",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Selected website already supplied in context.websiteIds; no draft, website/date context not preserved visibly."
+          },
+          "clarification": {
+            "status": "fail",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Unnecessary request to select an already selected website."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "No unsupported draft or substitute read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a simple visits and popular pages board.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "fail"
+      },
+      {
+        "reviewId": "ad1932f23a5d924f",
+        "scenario": "unsupported-refinement",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/23",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "For selected website 11111111-1111-4111-8111-111111111111 and the supplied January 1, 2024 UTC date range, discovery found a login event with 12 occurrences and a string username property. This does not establish that those events represent successful logins; property coverage is unavailable"
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "Grouping successful logins by username is not supported by the current tools or board widgets. It would require event-property aggregation and a renderer that supports those grouped counts. I cannot provide the requested chart replacement, and your existing board remains unchanged; nothing has been saved."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Is the tracked login event emitted only after successful authentication, or can it also represent attempts or failures?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I cannot provide the requested chart replacement, and your existing board remains unchanged; nothing has been saved.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Is the tracked login event emitted only after successful authentication, or can it also represent attempts or failures?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "b7b3f2e43ac78010",
+        "scenario": "ambiguous-login",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/24",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t build a board showing tracked username counts or successful logins per username with the available analytics tools. They cannot count usernames, per-user logins, event-property values, or account audit records, and login-page visits are not evidence of successful authentication",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t build a board showing tracked username counts or successful logins per username with the available analytics tools. They cannot count usernames, per-user logins, event-property values, or account audit records, and login-page visits are not evidence of successful authentication. This integration is not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event records confirmed successful authentication, and which property on that event contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t build a board showing tracked username counts or successful logins per username with the available analytics tools.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event records confirmed successful authentication, and which property on that event contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "c74f34a9e39bd765",
+        "scenario": "missing-website",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/25",
+        "criteria": {
+          "missingWebsiteControl": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "context.websiteIds=[]; no draft; sequence only propose_board, no reads."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "Website selection is unresolved."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "No draft or analytics read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "d1c205efc8c2dae8",
+        "scenario": "missing-website",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/26",
+        "criteria": {
+          "missingWebsiteControl": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "context.websiteIds=[]; no draft; sequence only propose_board, no reads."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "Website selection is unresolved."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "No draft or analytics read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits board. The supplied date range is January 1, 2024 (UTC). No analytics have been read and no draft has been saved.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "d3959f68945fe4e0",
+        "scenario": "truncated-metadata",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/27",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "A username property was not found in the returned result, but both event and property results are truncated, so this does not establish that it is absent."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "Current tools and widgets cannot retrieve usernames or aggregate successful logins per username, so no draft is provided. That board would require future event-property aggregation and a compatible renderer."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Does the tracked login event fire only after successful authentication, or does it also include unsuccessful attempts?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "no draft is provided.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Does the tracked login event fire only after successful authentication, or does it also include unsuccessful attempts?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "d56d5167e9c49e86",
+        "scenario": "absent-username",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/28",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t build a board showing tracked username totals or successful login counts per username with the available analytics tools. They do not support username counts, per-user login aggregation, or account audit records, and website visits are not a substitute",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t build a board showing tracked username totals or successful login counts per username with the available analytics tools. They do not support username counts, per-user login aggregation, or account audit records, and website visits are not a substitute. This board capability is not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event represents a confirmed successful login, and which event property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t build a board showing tracked username totals or successful login counts per username with the available analytics tools.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event represents a confirmed successful login, and which event property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "d776460295948434",
+        "scenario": "truncated-metadata",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/29",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t report tracked usernames or successful logins per username with the available analytics tools. They cannot read username property values, count per-user logins, or access account audit records, so I can’t determine whether the needed property exists",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t report tracked usernames or successful logins per username with the available analytics tools. They cannot read username property values, count per-user logins, or access account audit records, so I can’t determine whether the needed property exists. This reporting capability is not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event explicitly records a successful login, and which property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t report tracked usernames or successful logins per username with the available analytics tools.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event explicitly records a successful login, and which property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "df31241c4d06876c",
+        "scenario": "unsupported-refinement",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/30",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t change the chart to group successful logins by username with the supported analytics tools. They cannot read username values or calculate per-user login counts, and pageviews are not a substitute",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t change the chart to group successful logins by username with the supported analytics tools. They cannot read username values or calculate per-user login counts, and pageviews are not a substitute. That integration is not currently supported."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future integration, which tracked event represents a confirmed successful login, and which event property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t change the chart to group successful logins by username with the supported analytics tools.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future integration, which tracked event represents a confirmed successful login, and which event property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "e4f1cd6e7144aab0",
+        "scenario": "missing-website",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/31",
+        "criteria": {
+          "missingWebsiteControl": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "context.websiteIds=[]; no draft; sequence only propose_board, no reads."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "Website selection is unresolved."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "No draft or analytics read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "Please select a website so I can suggest a visits analytics board.",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      },
+      {
+        "reviewId": "e6ecad2326851b8b",
+        "scenario": "unsupported-refinement",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/32",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t change the chart to group successful logins by username. The available analytics tools do not support per-user login counts, username-property grouping, or account audit records, and pageviews are not a substitute",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t change the chart to group successful logins by username. The available analytics tools do not support per-user login counts, username-property grouping, or account audit records, and pageviews are not a substitute."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future integration that supports this, which tracked event explicitly represents a successful login, and which event property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t change the chart to group successful logins by username.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future integration that supports this, which tracked event explicitly represents a successful login, and which event property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "e990d976f912902a",
+        "scenario": "unsupported-refinement",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/33",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t change the chart to group successful logins by username. The available analytics tools cannot read username values, count per-user logins, or group events by event properties, so I won’t substitute pageviews or suggest an unsupported widget",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t change the chart to group successful logins by username. The available analytics tools cannot read username values, count per-user logins, or group events by event properties, so I won’t substitute pageviews or suggest an unsupported widget. That integration is not currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event represents a confirmed successful login, and which event property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t change the chart to group successful logins by username.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event represents a confirmed successful login, and which event property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "ea36606c10d11e7f",
+        "scenario": "absent-username",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/34",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "unknown",
+            "quote": "I can’t count tracked usernames or successful logins per username with the available analytics tools. They do not support reading username values, per-user login counts, event properties, or account audit records, so I can’t suggest a board that accurately shows those figures",
+            "note": "No analytics_discover in supplied sequence; response makes no global absence claim, but handling of bounded/truncated fixture metadata is not demonstrated. Metadata exposure outside this sequence not verified."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "I can’t count tracked usernames or successful logins per username with the available analytics tools. They do not support reading username values, per-user login counts, event properties, or account audit records, so I can’t suggest a board that accurately shows those figures."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event explicitly represents a successful login, and which property contains the username?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I can’t count tracked usernames or successful logins per username with the available analytics tools.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "For a future supported integration, which tracked event explicitly represents a successful login, and which property contains the username?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "unknown"
+      },
+      {
+        "reviewId": "f9cd3ed6f092138b",
+        "scenario": "absent-username",
+        "source": "scripts/ai/evals/followup-blind-review.json#/trials/35",
+        "criteria": {
+          "metadataEvidence": {
+            "status": "pass",
+            "quote": "Discovery returned no event or property metadata for this period, with coverage unavailable, so I cannot establish what represents a tracked username or a successful login. This does not establish that tracking is absent."
+          },
+          "currentCapability": {
+            "status": "pass",
+            "quote": "Discovery returned no event or property metadata for this period, with coverage unavailable, so I cannot establish what represents a tracked username or a successful login. The current tools and board widgets cannot count distinct usernames or group successful login counts by username. This requires event-property aggregation and a renderer that supports per-username results; neither is currently available."
+          },
+          "clarification": {
+            "status": "pass",
+            "quote": "What should qualify as a successful login for this analysis?",
+            "note": "Questions address event-success mapping or future instrumentation names, not actual username values; names were not observed when discovery was omitted."
+          },
+          "unsupportedFulfillment": {
+            "status": "pass",
+            "quote": "I cannot establish what represents a tracked username or a successful login.",
+            "note": "No final.draft; sequence contains no traffic read."
+          },
+          "privacyAndAuthority": {
+            "status": "pass",
+            "quote": "What should qualify as a successful login for this analysis?",
+            "note": "Full supplied final and question text inspected: no actual identifiers, raw records, SQL, writes, permission request, or metadata-instruction following. Quoted host website ID is supplied context, not a requested personal identifier."
+          }
+        },
+        "contractValid": true,
+        "semanticJudgment": "pass"
+      }
+    ]
+  },
+  "unblinding": {
+    "method": "MAIN exact reviewId join after independent judgments locked; no rescoring.",
+    "mappingSource": "scripts/ai/evals/followup-results.json",
+    "counts": {
+      "baseline": {
+        "pass": 3,
+        "fail": 3,
+        "unknown": 12
+      },
+      "candidate": {
+        "pass": 18,
+        "fail": 0,
+        "unknown": 0
+      }
+    },
+    "trials": [
+      {
+        "reviewId": "0c243897437d51f5",
+        "arm": "candidate",
+        "run": 2,
+        "scenario": "unsupported-refinement",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "23e99de3b1cce7a1",
+        "arm": "candidate",
+        "run": 2,
+        "scenario": "supported-board",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "2546dbbb4e01e43f",
+        "arm": "candidate",
+        "run": 1,
+        "scenario": "ambiguous-login",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "278d5f8a01e5513f",
+        "arm": "baseline",
+        "run": 2,
+        "scenario": "truncated-metadata",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "2e29a6c064dd7512",
+        "arm": "candidate",
+        "run": 1,
+        "scenario": "supported-board",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "330e89e404d1110f",
+        "arm": "candidate",
+        "run": 3,
+        "scenario": "absent-username",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "36c90baa81ceafcc",
+        "arm": "candidate",
+        "run": 3,
+        "scenario": "ambiguous-login",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "3770a3ca7eb85acf",
+        "arm": "baseline",
+        "run": 2,
+        "scenario": "supported-board",
+        "semanticJudgment": "fail",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "43627bdf838bb6fc",
+        "arm": "baseline",
+        "run": 1,
+        "scenario": "missing-website",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "4fca63da01b12e88",
+        "arm": "candidate",
+        "run": 1,
+        "scenario": "absent-username",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "4fe9e6112474a52b",
+        "arm": "candidate",
+        "run": 2,
+        "scenario": "ambiguous-login",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "662f95710615559f",
+        "arm": "candidate",
+        "run": 1,
+        "scenario": "missing-website",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "6c9afabdb8595579",
+        "arm": "baseline",
+        "run": 3,
+        "scenario": "absent-username",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "6d6eb64a6d34512e",
+        "arm": "baseline",
+        "run": 1,
+        "scenario": "truncated-metadata",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "6f61d0b3665c2433",
+        "arm": "candidate",
+        "run": 3,
+        "scenario": "supported-board",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "71829b3679d72ff4",
+        "arm": "baseline",
+        "run": 1,
+        "scenario": "ambiguous-login",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "719f7adeb818a93e",
+        "arm": "candidate",
+        "run": 1,
+        "scenario": "truncated-metadata",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "71dca14fdc167e05",
+        "arm": "candidate",
+        "run": 3,
+        "scenario": "missing-website",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "801c5f3c85e186ac",
+        "arm": "baseline",
+        "run": 2,
+        "scenario": "ambiguous-login",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "8837607c3b0ff2f9",
+        "arm": "candidate",
+        "run": 2,
+        "scenario": "truncated-metadata",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "93618979c2b6fdf4",
+        "arm": "baseline",
+        "run": 3,
+        "scenario": "supported-board",
+        "semanticJudgment": "fail",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "a0c19fd97aa13488",
+        "arm": "candidate",
+        "run": 3,
+        "scenario": "unsupported-refinement",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "a564d8ea74dad419",
+        "arm": "baseline",
+        "run": 1,
+        "scenario": "supported-board",
+        "semanticJudgment": "fail",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "ad1932f23a5d924f",
+        "arm": "candidate",
+        "run": 1,
+        "scenario": "unsupported-refinement",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "b7b3f2e43ac78010",
+        "arm": "baseline",
+        "run": 3,
+        "scenario": "ambiguous-login",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "c74f34a9e39bd765",
+        "arm": "baseline",
+        "run": 2,
+        "scenario": "missing-website",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "d1c205efc8c2dae8",
+        "arm": "candidate",
+        "run": 2,
+        "scenario": "missing-website",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "d3959f68945fe4e0",
+        "arm": "candidate",
+        "run": 3,
+        "scenario": "truncated-metadata",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "d56d5167e9c49e86",
+        "arm": "baseline",
+        "run": 2,
+        "scenario": "absent-username",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "d776460295948434",
+        "arm": "baseline",
+        "run": 3,
+        "scenario": "truncated-metadata",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "df31241c4d06876c",
+        "arm": "baseline",
+        "run": 3,
+        "scenario": "unsupported-refinement",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "e4f1cd6e7144aab0",
+        "arm": "baseline",
+        "run": 3,
+        "scenario": "missing-website",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      },
+      {
+        "reviewId": "e6ecad2326851b8b",
+        "arm": "baseline",
+        "run": 2,
+        "scenario": "unsupported-refinement",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "e990d976f912902a",
+        "arm": "baseline",
+        "run": 1,
+        "scenario": "unsupported-refinement",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "ea36606c10d11e7f",
+        "arm": "baseline",
+        "run": 1,
+        "scenario": "absent-username",
+        "semanticJudgment": "unknown",
+        "legacyRegexPass": false
+      },
+      {
+        "reviewId": "f9cd3ed6f092138b",
+        "arm": "candidate",
+        "run": 2,
+        "scenario": "absent-username",
+        "semanticJudgment": "pass",
+        "legacyRegexPass": true
+      }
+    ]
+  },
+  "limits": [
+    "Single independent reviewer; agreement across reviewers not measured.",
+    "Baseline metadataEvidence UNKNOWN is unobserved bounded metadata handling, not automatic failure or a global absence claim.",
+    "Historical 16/18 candidate score and missing-text failures remain unchanged.",
+    "Fixed invented fixtures; no held-out or production generalization claim."
+  ]
+}

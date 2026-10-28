@@ -1,0 +1,42 @@
+{
+  "kind": "one-authorized-native-preflight",
+  "model": "cx/gpt-6.1-sol",
+  "reasoning": "medium",
+  "normalizedApiPath": "/v1",
+  "result": {
+    "checks": {
+      "proposal": true,
+      "discoveryFirst": true,
+      "correctDraftPresence": true,
+      "semanticClarification": true,
+      "capabilityHonesty": true,
+      "noAbsenceOverclaim": true,
+      "noUnsafeValueRequest": true,
+      "boundedQuestions": true,
+      "noUnnecessaryQuestions": true,
+      "missingWebsiteNoReads": true
+    },
+    "questionCount": 0,
+    "semanticQuestion": false,
+    "unsupported": false,
+    "unsafeValueRequest": false,
+    "unnecessaryQuestions": 0,
+    "hallucinatedWidget": 0,
+    "pass": true,
+    "failure": null,
+    "providerCategory": null,
+    "sequence": [
+      "propose_board"
+    ],
+    "nativeEvents": [
+      "propose_board"
+    ],
+    "invalidArgs": 0,
+    "forbiddenReads": 0,
+    "modelCalls": 2,
+    "inputTokens": 6965,
+    "outputTokens": 244,
+    "reportedCost": 0,
+    "seconds": 12.953
+  }
+}

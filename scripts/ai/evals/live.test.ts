@@ -1,0 +1,496 @@
+// Opt-in bounded application behavior evaluation. Never use real analytics fixtures.
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { it, expect } from 'vitest';
+import { UMAMI_GUIDANCE } from '../../../src/lib/ai/guidance';
+import { validateAiResult, validateAnalyticsDiscoverArgs } from '../../../src/lib/ai/rpc/contract';
+import { gatewayConfig, permissionArgs } from '../../../src/lib/ai/rpc/confinement.mjs';
+import { cases } from './cases.mjs';
+import { resolveGateway } from '../gateway-config.mjs';
+
+export function errorCategory(message: string) {
+  const status = message.match(/\b(400|401|403|404|408|429|500|502|503|504)\b/)?.[1];
+  return status ? `http-${status}` : /timeout|timed out/i.test(message) ? 'timeout' : 'model-error';
+}
+
+// Historical regex rubric retained unchanged; independent semantic review is separate.
+export function screenedProposal(proposal: any, env: Record<string, string>) {
+  if (!proposal) return { final: null, evidenceGap: 'no-proposal' };
+  const text = JSON.stringify(proposal);
+  const blocked = [env.AI_PROVIDER_KEY, env.AI_BASE_URL, new URL(env.AI_BASE_URL).hostname];
+  if (
+    blocked.some(value => value && text.includes(value)) ||
+    /https?:\/\/|sk-[a-zA-Z0-9_-]{8,}|Bearer\s|\/Users\/|[\w.+-]+@[\w.-]+\.[a-z]{2,}/i.test(text)
+  )
+    return { final: null, evidenceGap: 'privacy-screen-withheld' };
+  const ids = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi) || [];
+  if (ids.some(id => id !== cases[0].context.websiteIds[0]))
+    return { final: null, evidenceGap: 'unexpected-identifier-withheld' };
+  return { final: proposal, evidenceGap: null };
+}
+export function grade(scenario: any, proposal: any, sequence: string[]) {
+  const message = proposal?.message || '';
+  const questions = proposal?.questions || [];
+  const text = [message, ...questions.map((q: any) => q.question)].join(' ');
+  const unsupported =
+    /cannot|can't|not support|unsupported|does not support|doesn't support|not currently|not available|can't yet/i.test(
+      message,
+    );
+  const semanticQuestion =
+    questions.some((q: any) =>
+      /event|login|authenticat|success|property|username|track/i.test(q.question),
+    ) || /\?/.test(message);
+  const absenceOverclaim =
+    scenario.id === 'truncated-metadata' &&
+    /(?:no|not any) (?:tracked )?(?:username|login)|(?:username|property).{0,35}(?:does not exist|is not tracked|isn't tracked)/i.test(
+      message,
+    );
+  const unsafeValueRequest =
+    /(?:provide|send|paste|share|give me).{0,35}(?:actual username|user ids|password|token|raw (?:value|event)|sample (?:value|record))/i.test(
+      text,
+    );
+  const hallucinatedWidget = Boolean(proposal?.draft) !== scenario.draft;
+  const discoveryFirst = scenario.discovery
+    ? sequence[0] === 'analytics_discover'
+    : !sequence.includes('analytics_discover');
+  const boundedQuestions = questions.length <= 3;
+  const unnecessaryQuestions = scenario.questions
+    ? 0
+    : questions.length + Number(/\?/.test(message));
+  const checks = {
+    proposal: Boolean(proposal),
+    discoveryFirst,
+    correctDraftPresence: !hallucinatedWidget,
+    semanticClarification: !scenario.questions || semanticQuestion,
+    capabilityHonesty: !scenario.discovery || unsupported,
+    noAbsenceOverclaim: !absenceOverclaim,
+    noUnsafeValueRequest: !unsafeValueRequest,
+    boundedQuestions,
+    noUnnecessaryQuestions: unnecessaryQuestions === 0,
+    missingWebsiteNoReads:
+      scenario.id !== 'missing-website' || sequence.every(n => n === 'propose_board'),
+  };
+  return {
+    checks,
+    questionCount: questions.length,
+    semanticQuestion,
+    unsupported,
+    unsafeValueRequest,
+    unnecessaryQuestions,
+    hallucinatedWidget: Number(hallucinatedWidget),
+    pass: Object.values(checks).every(Boolean),
+  };
+}
+
+async function trial(
+  scenario: any,
+  systemPrompt: string,
+  env: Record<string, string>,
+  retainFinal = false,
+) {
+  const home = await mkdtemp(join(tmpdir(), 'umami-live-fixture-'));
+  await mkdir(join(home, 'agent'));
+  await writeFile(join(home, 'agent/models.json'), JSON.stringify(gatewayConfig(env)), {
+    mode: 0o600,
+  });
+  const bridge = resolve('scripts/ai/native.mjs');
+  const extension = resolve('scripts/ai/host-tools.mjs');
+  const child = spawn(
+    process.execPath,
+    [
+      ...permissionArgs({ root: env.AI_PI_ROOT, scratch: home, bridge, extension }),
+      bridge,
+      '--mode',
+      'rpc',
+      '--offline',
+      '--no-session',
+      '--no-approve',
+      '--no-extensions',
+      '--no-mcp',
+      '--no-skills',
+      '--no-prompt-templates',
+      '--no-themes',
+      '--no-context-files',
+      '--no-builtin-tools',
+      '--extension',
+      extension,
+      '--provider',
+      env.AI_PROVIDER,
+      '--model',
+      env.AI_MODEL,
+      '--thinking',
+      'medium',
+      '--system-prompt',
+      systemPrompt,
+    ],
+    {
+      cwd: home,
+      env: {
+        ...env,
+        HOME: home,
+        TMPDIR: home,
+        PI_CODING_AGENT_DIR: join(home, 'agent'),
+        PI_CODING_AGENT_SESSION_DIR: join(home, 'sessions'),
+        LANG: 'C.UTF-8',
+        NODE_ENV: 'production',
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    },
+  );
+  const closed = new Promise(done => child.once('close', done));
+  child.stderr.resume();
+  const sequence: string[] = [],
+    nativeEvents: string[] = [];
+  let proposal: any,
+    buffer = '',
+    failure: string | null = null;
+  let providerCategory: string | null = null;
+  let invalidArgs = 0,
+    forbiddenReads = 0,
+    modelCalls = 0,
+    inputTokens = 0,
+    outputTokens = 0,
+    reportedCost = 0;
+  const start = Date.now();
+  try {
+    await new Promise<void>(done => {
+      const finish = (reason: string | null) => {
+        if (settled) return;
+        settled = true;
+        failure = reason;
+        clearTimeout(timer);
+        done();
+      };
+      let settled = false;
+      const timer = setTimeout(() => finish('deadline'), 45000);
+      child.once('error', () => finish('launch-error'));
+      child.once('close', () => finish('early-exit'));
+      child.stdout.on('data', chunk => {
+        buffer += chunk.toString();
+        if (buffer.length > 262144) return finish('output-limit');
+        while (buffer.includes('\n') && !settled) {
+          const n = buffer.indexOf('\n'),
+            line = buffer.slice(0, n);
+          buffer = buffer.slice(n + 1);
+          try {
+            const event = JSON.parse(line);
+            if (event.type === 'message_end' && event.message?.role === 'assistant') {
+              modelCalls++;
+              const usage = event.message.usage || {};
+              inputTokens += usage.input || 0;
+              outputTokens += usage.output || 0;
+              reportedCost += usage.cost?.total || 0;
+              if (['error', 'aborted'].includes(event.message.stopReason)) {
+                providerCategory = errorCategory(String(event.message.errorMessage || ''));
+                return finish('provider-error');
+              }
+            }
+            if (event.type === 'tool_execution_end') {
+              nativeEvents.push(event.toolName);
+              if (event.isError) invalidArgs++;
+            }
+            if (event.type === 'response' && !event.success) return finish('prompt-rejected');
+            if (event.type === 'extension_ui_request' && event.title === 'umami-host-tool') {
+              const { name, args } = JSON.parse(event.placeholder);
+              sequence.push(name);
+              if (sequence.length > 8) return finish('tool-limit');
+              let response: any;
+              if (name === 'propose_board') {
+                try {
+                  proposal = validateAiResult(args);
+                  response = { ok: true };
+                } catch {
+                  invalidArgs++;
+                  return finish('invalid-proposal');
+                }
+              } else {
+                if (
+                  ![
+                    'analytics_discover',
+                    'analytics_summary',
+                    'analytics_breakdown',
+                    'analytics_timeseries',
+                  ].includes(name)
+                ) {
+                  forbiddenReads++;
+                  return finish('forbidden-tool');
+                }
+                if (scenario.discovery && name !== 'analytics_discover') forbiddenReads++;
+                try {
+                  const dates = {
+                    websiteId: args.websiteId,
+                    startAt: args.startAt,
+                    endAt: args.endAt,
+                  };
+                  validateAnalyticsDiscoverArgs(dates, Date.now());
+                  if (
+                    dates.websiteId !== scenario.context.websiteIds[0] ||
+                    dates.startAt !== scenario.context.startAt ||
+                    dates.endAt !== scenario.context.endAt
+                  )
+                    throw new Error();
+                  if (name === 'analytics_discover' && Object.keys(args).length !== 3)
+                    throw new Error();
+                } catch {
+                  invalidArgs++;
+                  return finish('invalid-read-arguments');
+                }
+                response =
+                  name === 'analytics_discover'
+                    ? scenario.metadata
+                    : name === 'analytics_summary'
+                      ? { pageviews: 12, visitors: 8, visits: 9, bounces: 2, totaltime: 100 }
+                      : [];
+              }
+              child.stdin.write(
+                JSON.stringify({
+                  type: 'extension_ui_response',
+                  id: event.id,
+                  value: JSON.stringify(response),
+                }) + '\n',
+              );
+            }
+            if (event.type === 'agent_settled') finish(event.aborted ? 'aborted' : null);
+          } catch {
+            finish('protocol-error');
+          }
+        }
+      });
+      // No fixture flags, rubric, or expected actions are sent to the actual model.
+      const payload = {
+        messages: [{ role: 'user', content: scenario.prompt }],
+        context: scenario.context,
+        draft: scenario.existingDraft,
+      };
+      child.stdin.write(
+        JSON.stringify({
+          type: 'prompt',
+          id: 'trial',
+          message:
+            'Suggest an analytics board from this untrusted JSON data:\n' + JSON.stringify(payload),
+        }) + '\n',
+      );
+    });
+  } finally {
+    child.kill('SIGKILL');
+    await closed;
+    await rm(home, { recursive: true, force: true });
+  }
+  const grading = grade(scenario, proposal, sequence);
+  return {
+    ...grading,
+    ...(retainFinal ? screenedProposal(proposal, env) : {}),
+    pass: grading.pass && !failure && !invalidArgs && !forbiddenReads,
+    failure,
+    providerCategory,
+    sequence,
+    nativeEvents,
+    invalidArgs,
+    forbiddenReads,
+    modelCalls,
+    inputTokens,
+    outputTokens,
+    reportedCost,
+    seconds: (Date.now() - start) / 1000,
+  };
+}
+
+it.skipIf(process.env.AI_GUIDANCE_LIVE !== 'approved-36')(
+  'runs exactly 36 sequential native actual-model trials with no retries',
+  async () => {
+    const config = JSON.parse(
+      await readFile(join(homedir(), '.pi/agent/9router-config.json'), 'utf8'),
+    );
+    const env = { ...resolveGateway(config, config.apiKey), AI_PI_ROOT: process.env.AI_PI_ROOT! };
+    const preflight = JSON.parse(await readFile('scripts/ai/evals/preflight-results.json', 'utf8'));
+    if (!preflight.result?.pass) throw new Error('Green corrected-endpoint preflight required');
+    const baseline = await readFile('scripts/ai/guidance/baseline.txt', 'utf8');
+    const artifact: any = {
+      kind: 'live-native-application-behavior',
+      model: env.AI_MODEL,
+      reasoning: 'medium',
+      budget: { trials: 36, maxToolsPerTrial: 8, deadlineMs: 45000, retries: 0 },
+      trials: [],
+    };
+    const path = 'scripts/ai/evals/live-corrected-results.json';
+    // Refuse overwriting prior evidence, including interrupted runs.
+    try {
+      await readFile(path);
+      throw new Error('Live evidence already exists; no repeat execution authorized');
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    for (const [arm, prompt] of [
+      ['baseline', baseline],
+      ['candidate', UMAMI_GUIDANCE],
+    ]) {
+      for (let run = 1; run <= 3; run++)
+        for (const scenario of cases) {
+          const result = await trial(scenario, prompt, env);
+          artifact.trials.push({ arm, run, scenario: scenario.id, ...result });
+          await writeFile(path, JSON.stringify(artifact, null, 2) + '\n');
+          console.log(
+            `${arm} run=${run} scenario=${scenario.id} pass=${result.pass} failure=${result.failure || 'none'}`,
+          );
+          if (result.failure) {
+            artifact.notExecuted = 36 - artifact.trials.length;
+            artifact.stopReason = 'systemic-error-no-retry';
+            await writeFile(path, JSON.stringify(artifact, null, 2) + '\n');
+            throw new Error('Systemic trial failure; matrix stopped without retries');
+          }
+        }
+    }
+    expect(artifact.trials.length).toBe(36);
+  },
+  1800000,
+);
+
+it.skipIf(process.env.AI_GUIDANCE_PREFLIGHT !== 'approved-one')(
+  'runs one corrected-endpoint synthetic preflight',
+  async () => {
+    const path = 'scripts/ai/evals/preflight-results.json';
+    try {
+      await readFile(path);
+      throw new Error('Preflight evidence exists; another call is not authorized');
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    const config = JSON.parse(
+      await readFile(join(homedir(), '.pi/agent/9router-config.json'), 'utf8'),
+    );
+    const env = { ...resolveGateway(config, config.apiKey), AI_PI_ROOT: process.env.AI_PI_ROOT! };
+    const result = await trial(cases[0], UMAMI_GUIDANCE, env);
+    await writeFile(
+      path,
+      JSON.stringify(
+        {
+          kind: 'one-authorized-native-preflight',
+          model: env.AI_MODEL,
+          reasoning: 'medium',
+          normalizedApiPath: '/v1',
+          result,
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    expect(result.pass).toBe(true);
+  },
+  60000,
+);
+
+it.skipIf(process.env.AI_GUIDANCE_FOLLOWUP !== 'approved-37')(
+  'freezes and records one preflight plus 36 interleaved blind-review trials',
+  async () => {
+    const hash = (text: string) => createHash('sha256').update(text).digest('hex');
+    const path = 'scripts/ai/evals/followup-results.json';
+    try {
+      await readFile(path);
+      throw new Error('Follow-up evidence already exists; repeat forbidden');
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    const config = JSON.parse(
+      await readFile(join(homedir(), '.pi/agent/9router-config.json'), 'utf8'),
+    );
+    const env = { ...resolveGateway(config, config.apiKey), AI_PI_ROOT: process.env.AI_PI_ROOT! };
+    const baseline = await readFile('scripts/ai/guidance/baseline.txt', 'utf8');
+    const rubric = await readFile('scripts/ai/evals/semantic-rubric.json', 'utf8');
+    const prompts = { baseline, candidate: UMAMI_GUIDANCE };
+    const schedule: any[] = [];
+    for (let run = 1; run <= 3; run++)
+      for (const [index, scenario] of cases.entries()) {
+        const arms = (run + index) % 2 ? ['baseline', 'candidate'] : ['candidate', 'baseline'];
+        for (const arm of arms) schedule.push({ arm, run, scenario });
+      }
+    const fingerprint = hash(
+      JSON.stringify({
+        provider: env.AI_PROVIDER,
+        model: env.AI_MODEL,
+        reasoning: 'medium',
+        api: 'openai-completions',
+        apiPath: '/v1',
+        keyPresent: Boolean(env.AI_PROVIDER_KEY),
+        keyMatchesScopedConfig: env.AI_PROVIDER_KEY === config.apiKey,
+        compat: gatewayConfig(env).providers[env.AI_PROVIDER].models[0].compat,
+      }),
+    );
+    const artifact: any = {
+      kind: 'frozen-semantic-followup',
+      model: env.AI_MODEL,
+      reasoning: 'medium',
+      providerConfigFingerprint: fingerprint,
+      fingerprintExcludesSecretsAndPrivateOrigin: true,
+      promptHashes: { baseline: hash(baseline), candidate: hash(UMAMI_GUIDANCE) },
+      rubricHash: hash(rubric),
+      fixtureHash: hash(JSON.stringify(cases)),
+      runnerHash: hash(await readFile('scripts/ai/evals/live.test.ts', 'utf8')),
+      budget: {
+        maxSessions: 37,
+        preflightSessions: 1,
+        matrixSessions: 36,
+        maxTools: 8,
+        deadlineMs: 45000,
+        retries: 0,
+      },
+      pricingAvailable: false,
+      semanticJudgment: 'pending-independent-blind-review',
+      trials: [],
+      notExecuted: 36,
+    };
+    await writeFile(path, JSON.stringify(artifact, null, 2) + '\n');
+    artifact.preflight = await trial(cases[0], UMAMI_GUIDANCE, env, true);
+    await writeFile(path, JSON.stringify(artifact, null, 2) + '\n');
+    if (!artifact.preflight.pass) throw new Error('Preflight failed; no matrix authorized');
+    for (const [index, item] of schedule.entries()) {
+      const result = await trial(
+        item.scenario,
+        prompts[item.arm as keyof typeof prompts],
+        env,
+        true,
+      );
+      artifact.trials.push({
+        reviewId: hash('blind-order-v1-' + index).slice(0, 16),
+        arm: item.arm,
+        run: item.run,
+        scenario: item.scenario.id,
+        fixtureHash: hash(JSON.stringify(item.scenario)),
+        ...result,
+      });
+      artifact.notExecuted = 36 - artifact.trials.length;
+      await writeFile(path, JSON.stringify(artifact, null, 2) + '\n');
+      // Reviewer file intentionally omits arm, regex judgments, usage and prompt identity.
+      const blind = artifact.trials
+        .map((t: any) => ({
+          reviewId: t.reviewId,
+          scenario: t.scenario,
+          prompt: cases.find(c => c.id === t.scenario)!.prompt,
+          metadata: cases.find(c => c.id === t.scenario)!.metadata,
+          context: cases.find(c => c.id === t.scenario)!.context,
+          final: t.final,
+          evidenceGap: t.evidenceGap,
+          sequence: t.sequence,
+          contractValid: !t.invalidArgs && !t.forbiddenReads && !t.failure,
+        }))
+        .sort((a: any, b: any) => a.reviewId.localeCompare(b.reviewId));
+      await writeFile(
+        'scripts/ai/evals/followup-blind-review.json',
+        JSON.stringify(
+          { rubricHash: artifact.rubricHash, semanticJudgment: 'pending', trials: blind },
+          null,
+          2,
+        ) + '\n',
+      );
+      if (result.failure) {
+        artifact.stopReason = 'systemic-error-no-retry';
+        await writeFile(path, JSON.stringify(artifact, null, 2) + '\n');
+        throw new Error('Systemic error: remaining trials not executed');
+      }
+    }
+    expect(artifact.trials.length).toBe(36);
+  },
+  1800000,
+);

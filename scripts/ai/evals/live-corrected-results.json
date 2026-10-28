@@ -1,0 +1,1441 @@
+{
+  "kind": "live-native-application-behavior",
+  "model": "cx/gpt-6.1-sol",
+  "reasoning": "medium",
+  "budget": {
+    "trials": 36,
+    "maxToolsPerTrial": 8,
+    "deadlineMs": 45000,
+    "retries": 0
+  },
+  "trials": [
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "supported-board",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6697,
+      "outputTokens": 225,
+      "reportedCost": 0,
+      "seconds": 11.502
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "missing-website",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4454,
+      "outputTokens": 35,
+      "reportedCost": 0,
+      "seconds": 8.559
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "ambiguous-login",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4609,
+      "outputTokens": 169,
+      "reportedCost": 0,
+      "seconds": 12.203
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "absent-username",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 8802,
+      "outputTokens": 103,
+      "reportedCost": 0,
+      "seconds": 11.827
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "truncated-metadata",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": false,
+        "capabilityHonesty": false,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4519,
+      "outputTokens": 34,
+      "reportedCost": 0,
+      "seconds": 7.938
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "unsupported-refinement",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": false,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4552,
+      "outputTokens": 97,
+      "reportedCost": 0,
+      "seconds": 10.187
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "supported-board",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4638,
+      "outputTokens": 225,
+      "reportedCost": 0,
+      "seconds": 13.119
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "missing-website",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4454,
+      "outputTokens": 35,
+      "reportedCost": 0,
+      "seconds": 6.927
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "ambiguous-login",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4478,
+      "outputTokens": 99,
+      "reportedCost": 0,
+      "seconds": 13.013
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "absent-username",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": false,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4439,
+      "outputTokens": 94,
+      "reportedCost": 0,
+      "seconds": 13.578
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "truncated-metadata",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4568,
+      "outputTokens": 178,
+      "reportedCost": 0,
+      "seconds": 13.788
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "unsupported-refinement",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4553,
+      "outputTokens": 100,
+      "reportedCost": 0,
+      "seconds": 8.634
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "supported-board",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": false,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 1,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6557,
+      "outputTokens": 68,
+      "reportedCost": 0,
+      "seconds": 8.319
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "missing-website",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4454,
+      "outputTokens": 35,
+      "reportedCost": 0,
+      "seconds": 9.286
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "ambiguous-login",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4491,
+      "outputTokens": 106,
+      "reportedCost": 0,
+      "seconds": 13.028
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "absent-username",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4602,
+      "outputTokens": 228,
+      "reportedCost": 0,
+      "seconds": 17.74
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "truncated-metadata",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6517,
+      "outputTokens": 114,
+      "reportedCost": 0,
+      "seconds": 13.208
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "unsupported-refinement",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": false,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 4811,
+      "outputTokens": 102,
+      "reportedCost": 0,
+      "seconds": 9.716
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "supported-board",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6942,
+      "outputTokens": 221,
+      "reportedCost": 0,
+      "seconds": 12.185
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "missing-website",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6980,
+      "outputTokens": 55,
+      "reportedCost": 0,
+      "seconds": 12.479
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "ambiguous-login",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 9216,
+      "outputTokens": 301,
+      "reportedCost": 0,
+      "seconds": 16.97
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "absent-username",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": false,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12039,
+      "outputTokens": 298,
+      "reportedCost": 0,
+      "seconds": 15.013
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "truncated-metadata",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11855,
+      "outputTokens": 277,
+      "reportedCost": 0,
+      "seconds": 14.777
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "unsupported-refinement",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12209,
+      "outputTokens": 257,
+      "reportedCost": 0,
+      "seconds": 15.338
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "supported-board",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6938,
+      "outputTokens": 215,
+      "reportedCost": 0,
+      "seconds": 10.994
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "missing-website",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6980,
+      "outputTokens": 55,
+      "reportedCost": 0,
+      "seconds": 6.999
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "ambiguous-login",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12156,
+      "outputTokens": 297,
+      "reportedCost": 0,
+      "seconds": 12.87
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "absent-username",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 14707,
+      "outputTokens": 278,
+      "reportedCost": 0,
+      "seconds": 14.526
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "truncated-metadata",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 9163,
+      "outputTokens": 279,
+      "reportedCost": 0,
+      "seconds": 14.435
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "unsupported-refinement",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11964,
+      "outputTokens": 271,
+      "reportedCost": 0,
+      "seconds": 12.031
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "supported-board",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 9781,
+      "outputTokens": 277,
+      "reportedCost": 0,
+      "seconds": 9.589
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "missing-website",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 0,
+      "semanticQuestion": false,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 2,
+      "inputTokens": 6971,
+      "outputTokens": 46,
+      "reportedCost": 0,
+      "seconds": 13.138
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "ambiguous-login",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 12156,
+      "outputTokens": 297,
+      "reportedCost": 0,
+      "seconds": 12.708
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "absent-username",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": false,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": false,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": false,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 9069,
+      "outputTokens": 272,
+      "reportedCost": 0,
+      "seconds": 16.159
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "truncated-metadata",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11879,
+      "outputTokens": 298,
+      "reportedCost": 0,
+      "seconds": 16.475
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "unsupported-refinement",
+      "checks": {
+        "proposal": true,
+        "discoveryFirst": true,
+        "correctDraftPresence": true,
+        "semanticClarification": true,
+        "capabilityHonesty": true,
+        "noAbsenceOverclaim": true,
+        "noUnsafeValueRequest": true,
+        "boundedQuestions": true,
+        "noUnnecessaryQuestions": true,
+        "missingWebsiteNoReads": true
+      },
+      "questionCount": 1,
+      "semanticQuestion": true,
+      "unsupported": true,
+      "unsafeValueRequest": false,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true,
+      "failure": null,
+      "providerCategory": null,
+      "sequence": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "nativeEvents": [
+        "analytics_discover",
+        "propose_board"
+      ],
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "modelCalls": 3,
+      "inputTokens": 11958,
+      "outputTokens": 262,
+      "reportedCost": 0,
+      "seconds": 13.819
+    }
+  ]
+}

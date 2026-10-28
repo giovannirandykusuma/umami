@@ -6,6 +6,7 @@ import { createCipheriv, createHash, createHmac, pbkdf2Sync, randomBytes, random
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { resolveGateway } from '../gateway-config.mjs';
 
 const image =
   process.env.RELEASE_SMOKE_IMAGE ||
@@ -37,14 +38,7 @@ const snapshot = () => sql(`SELECT json_build_object('boards',(SELECT json_agg(b
 // Read only numeric resource data; never emit command lines, child output or payloads.
 const meter = `const fs=require('fs');let pi=0,app=0,children=0;for(const p of fs.readdirSync('/proc').filter(x=>/^\\d+$/.test(x))){try{const cmd=fs.readFileSync('/proc/'+p+'/cmdline','utf8');if(!cmd.startsWith('node\\0'))continue;const rss=Number(fs.readFileSync('/proc/'+p+'/status','utf8').match(/VmRSS:\\s+(\\d+)/)?.[1]||0)*1024;if(cmd.includes('scripts/ai/native.mjs')){pi+=rss;children++}else if(p==='1')app+=rss;}catch{}}console.log(JSON.stringify({cgroup:Number(fs.readFileSync('/sys/fs/cgroup/memory.current','utf8')),cgroupLifetimePeak:Number(fs.readFileSync('/sys/fs/cgroup/memory.peak','utf8')),appRss:app,piRss:pi,children}));`;
 try {
-  assert.equal(process.env.AI_PROVIDER, 'nine-router');
-  assert.equal(process.env.AI_MODEL, 'cx/gpt-6.1-sol');
-  const url = new URL(process.env.AI_BASE_URL);
-  assert.equal(url.protocol, 'https:');
-  assert.equal(url.pathname, '/v1');
-  assert.equal(url.username + url.password + url.search + url.hash, '');
-  assert.equal(process.env.AI_EGRESS_ORIGINS, url.origin);
-  assert.ok(process.env.AI_PROVIDER_KEY && !/[\r\n]/.test(process.env.AI_PROVIDER_KEY));
+  const gateway = resolveGateway(process.env);
   const metadata = JSON.parse(docker(['image', 'inspect', image]));
   assert.equal(metadata[0].Architecture, 'amd64');
   evidence.runtime = JSON.parse(docker(['run', '--rm', '--platform', 'linux/amd64', '--entrypoint', 'node', image, '-e', `console.log(JSON.stringify({node:process.version,pi:require('/opt/umami-ai/node_modules/@earendil-works/pi-coding-agent/package.json').version}))`]));
@@ -62,10 +56,7 @@ try {
   const env = {
     DATABASE_URL: 'postgresql://synthetic:synthetic-only@synthetic-db:5432/synthetic',
     APP_SECRET: secret, AI_ENABLED: 'true', AI_PI_ROOT: '/opt/umami-ai/node_modules/@earendil-works/pi-coding-agent',
-    AI_PROVIDER: process.env.AI_PROVIDER, AI_MODEL: process.env.AI_MODEL,
-    AI_REASONING_LEVEL: 'medium',
-    AI_BASE_URL: process.env.AI_BASE_URL, AI_EGRESS_ORIGINS: process.env.AI_EGRESS_ORIGINS,
-    AI_PROVIDER_KEY: process.env.AI_PROVIDER_KEY, DISABLE_TELEMETRY: '1',
+    ...gateway, DISABLE_TELEMETRY: '1',
     ...(process.env.RELEASE_SMOKE_DIAGNOSTIC === '1' ? { NODE_OPTIONS: '--require=/tmp/release-smoke-diagnostic.cjs' } : {}),
   };
   const envfile = join(temp, 'app.env');

@@ -1,24 +1,12 @@
 // Bounded synthetic gateway probe: one plain request, and only on success one tool request.
 // Credentials and base URL come exclusively from the operator environment.
-const base = new URL(process.env.AI_BASE_URL);
-if (
-  base.protocol !== 'https:' ||
-  base.pathname !== '/v1' ||
-  base.search ||
-  base.hash ||
-  base.username ||
-  base.password
-)
-  throw new Error('invalid-provider-config');
-if (
-  process.env.AI_PROVIDER !== 'nine-router' ||
-  process.env.AI_MODEL !== 'cx/gpt-6.1-sol' ||
-  process.env.AI_EGRESS_ORIGINS !== base.origin
-)
-  throw new Error('invalid-provider-config');
+import { resolveGateway } from '../gateway-config.mjs';
+const gateway = resolveGateway(process.env);
+const base = new URL(gateway.AI_BASE_URL);
 async function probe(tool) {
   const body = {
-    model: process.env.AI_MODEL,
+    model: gateway.AI_MODEL,
+    reasoning_effort: gateway.AI_REASONING_LEVEL,
     max_tokens: tool ? 512 : 64,
     stream: false,
     messages: [
@@ -49,7 +37,7 @@ async function probe(tool) {
     const response = await fetch(`${base.origin}/v1/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.AI_PROVIDER_KEY}`,
+        Authorization: `Bearer ${gateway.AI_PROVIDER_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),

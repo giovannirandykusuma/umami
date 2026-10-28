@@ -1,0 +1,332 @@
+{
+  "model": "scripted-offline-provider",
+  "kind": "native-contract-only",
+  "behaviorEvidence": false,
+  "liveTrialsExecuted": 0,
+  "trials": [
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "supported-board",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "missing-website",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "ambiguous-login",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "absent-username",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "truncated-metadata",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 1,
+      "scenario": "unsupported-refinement",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "supported-board",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "missing-website",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "ambiguous-login",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "absent-username",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "truncated-metadata",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 2,
+      "scenario": "unsupported-refinement",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "supported-board",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "missing-website",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "ambiguous-login",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "absent-username",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "truncated-metadata",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "baseline",
+      "run": 3,
+      "scenario": "unsupported-refinement",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "supported-board",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "missing-website",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "ambiguous-login",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "absent-username",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "truncated-metadata",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 1,
+      "scenario": "unsupported-refinement",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "supported-board",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "missing-website",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "ambiguous-login",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "absent-username",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "truncated-metadata",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 2,
+      "scenario": "unsupported-refinement",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "supported-board",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "missing-website",
+      "sequence": ["propose_board"],
+      "nativeEvents": ["propose_board"],
+      "questionCount": 0,
+      "invalidArgs": 0,
+      "forbiddenReads": 0,
+      "unnecessaryQuestions": 0,
+      "hallucinatedWidget": 0,
+      "pass": true
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "ambiguous-login",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "absent-username",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "truncated-metadata",
+      "pass": false,
+      "failure": "native-contract-failure"
+    },
+    {
+      "arm": "candidate",
+      "run": 3,
+      "scenario": "unsupported-refinement",
+      "pass": false,
+      "failure": "native-contract-failure"
+    }
+  ]
+}

@@ -8,7 +8,10 @@ test('preserves the exact advertised model ID including both hyphens', () => {
   const advertised = { id: 'cx/gpt-6.1-sol' };
   for (const file of ['run.mjs', 'direct.mjs', 'metadata.mjs']) {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
-    assert.ok(source.includes(`'${advertised.id}'`));
+    const contract = source.includes('resolveGateway')
+      ? readFileSync(new URL('../gateway-config.mjs', import.meta.url), 'utf8')
+      : source;
+    assert.ok(contract.includes(`'${advertised.id}'`));
     assert.ok(!source.includes('cx/gpt6.1sol'));
   }
 });
@@ -39,7 +42,19 @@ function fixture() {
 test('classifies model errors without disclosing error strings or payloads', () => {
   const { child, output } = fixture();
   const secret = 'invented-secret-marker';
-  child.stdout.emit('data', Buffer.from(JSON.stringify({ type: 'message_end', message: { stopReason: 'error', errorMessage: `401 unauthorized ${secret}`, content: secret } }) + '\n'));
+  child.stdout.emit(
+    'data',
+    Buffer.from(
+      JSON.stringify({
+        type: 'message_end',
+        message: {
+          stopReason: 'error',
+          errorMessage: `401 unauthorized ${secret}`,
+          content: secret,
+        },
+      }) + '\n',
+    ),
+  );
   child.stderr.emit('data', Buffer.from(`ERR_ACCESS_DENIED ${secret}`));
   child.emit('close', 1, null);
   assert.equal(output.length, 1);
@@ -89,7 +104,15 @@ test('categorizes malformed analytics arguments without revealing values or unkn
 test('recognizes proposal object shape without emitting its content', () => {
   const { child, output } = fixture();
   const secret = 'invented-payload-marker';
-  const record = { type: 'extension_ui_request', method: 'input', title: 'umami-host-tool', placeholder: JSON.stringify({ name: 'propose_board', args: { message: secret, draft: { rows: [] } } }) };
+  const record = {
+    type: 'extension_ui_request',
+    method: 'input',
+    title: 'umami-host-tool',
+    placeholder: JSON.stringify({
+      name: 'propose_board',
+      args: { message: secret, draft: { rows: [] } },
+    }),
+  };
   const line = JSON.stringify(record) + '\n';
   child.stdout.emit('data', Buffer.from(line.slice(0, 12)));
   child.stdout.emit('data', Buffer.from(line.slice(12)));
