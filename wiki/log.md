@@ -39,3 +39,7 @@ Randy: page-only Assistant outside Boards, history+delete, act-as-user with dele
 ## [2026-10-28] 20261028-1700/compare-chart | DECIDE: widen to BoardComponentSelect
 
 Worker paused: no multi-website ConfigField in manual editor. MAIN approved widening Owns to BoardComponentSelect.tsx (+test) for a validated 2–10 websiteIds field; scalar fields unchanged. Disjoint from assistant-backend (no src/app).
+
+## [2026-10-28] 20261028-1700/assistant-backend | Global assistant backend merged
+
+Merged 2e2d1a2b8 after fresh judge ACCEPT (10 commands reproduced) and canonical squash gate (affected 35 tests). Per-user AiChat/AiChatMessage (additive migration 27_add_ai_assistant), SSE turns via native confined Pi with per-chat session restore, host loopback umami_api as requesting user, /api/auth and /api/ai blocked, delete confirm, ask_user, show_chart, open_link. MAIN added thin route re-exports; tsc baseline 4. Offline only: no live provider/DB yet. In-memory turn registry assumes single process.
