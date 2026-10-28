@@ -5,6 +5,22 @@ cp.spawn = function (command, args, options) {
   const child = original.apply(this, arguments);
   if (!Array.isArray(args) || !args.some(arg => String(arg).endsWith('/scripts/ai/native.mjs'))) return child;
   const result = { records: 0, invalidJson: 0, stderrBytes: 0, events: {}, categories: {}, exit: null, signal: false };
+  result.modelInputCanary = false;
+  result.modelInputObserved = false;
+  result.modelOutputCanary = false;
+  const canary = 'CANARY_INVENTED_USERNAME_NEVER_EXPOSE';
+  // Observe host→native input in memory; preserve the original bytes, callback and return value.
+  if (child.stdin?.write) {
+    const write = child.stdin.write;
+    let tail = '';
+    child.stdin.write = function (chunk) {
+      result.modelInputObserved = true;
+      const text = tail + String(chunk);
+      if (text.includes(canary)) result.modelInputCanary = true;
+      tail = text.slice(-(canary.length - 1));
+      return write.apply(this, arguments);
+    };
+  }
   let buffer = '';
   const count = key => { result.categories[key] = (result.categories[key] || 0) + 1; };
   child.stdout.on('data', chunk => {
@@ -15,6 +31,7 @@ cp.spawn = function (command, args, options) {
       const line = buffer.slice(0, newline);
       buffer = buffer.slice(newline + 1);
       try {
+        if (line.includes(canary)) result.modelOutputCanary = true;
         const record = JSON.parse(line);
         result.records++;
         const allowed = ['response', 'agent_start', 'agent_end', 'message_start', 'message_update', 'message_end', 'turn_start', 'turn_end', 'tool_execution_start', 'tool_execution_update', 'tool_execution_end', 'extension_ui_request'];
@@ -57,7 +74,7 @@ cp.spawn = function (command, args, options) {
             } else {
               count('read-request');
               const args = request.args || {};
-              const names = ['analytics_summary', 'analytics_breakdown', 'analytics_timeseries'];
+              const names = ['analytics_summary', 'analytics_breakdown', 'analytics_timeseries', 'analytics_discover'];
               count(names.includes(request.name) ? request.name : 'unknown-tool');
               count(
                 typeof args.websiteId === 'string' && /^[0-9a-f-]{36}$/i.test(args.websiteId)

@@ -20,7 +20,7 @@ Each user owns a separate invented website and board. The harness signs HMAC-SHA
 
 ## Reproduction and safety
 
-Run from the repository root with Docker, the pinned image loaded, and `postgres:16-alpine` available. The harness uses Node built-ins, not repository packages. Supply the following from an operator-controlled environment source, never a command-line key or committed private endpoint:
+Run from the repository root with Docker, the pinned image loaded, and `postgres:16-alpine` available. The current harness requires repository dependencies (`zod`) and a host Node version providing `stripTypeScriptTypes`; dependency installation is shown below. Supply the following from an operator-controlled environment source, never a command-line key or committed private endpoint:
 
 - `AI_PROVIDER=nine-router`
 - `AI_MODEL=cx/gpt-6.1-sol` — preserve **both hyphens** exactly
@@ -62,6 +62,109 @@ Earlier runs accidentally used **`cx/gpt6.1sol`**, missing both hyphens. These r
 The first corrected-ID run reached HTTP 200 but returned message-only proposals. A bounded prompt hypothesis explicitly requiring both top-level tool arguments then produced the three valid drafts above. No product change or permission broadening was needed in this lane.
 
 `direct.mjs` is a separately authorized bounded diagnostic (one plain request, then one invented tool-schema request only on success); its exit 0 means status reporting completed, not that a proposal passed. `metadata.mjs` performs one metadata GET and emits selected-model numeric/boolean fields only. Neither is needed for normal release smoke execution, and neither is a retry loop.
+
+## Discovery/questions SSE probe (spaced live chain passed; immediate UX fails)
+
+The generic runner now defaults to discovery-release image ID
+`sha256:e19f66d2fb480b7c3912662157e5530d6546f59a48745dc03e40c428b7b9d01a`
+(operator-supplied source revision: `3cc6fc0da`). Before inference it checks the exact
+`cx/gpt-6.1-sol` entry through the shared `/v1` resolver and compares image copies
+of the public result and board validators with this checkout. This comparison binds
+those files only; it does not attest every image source file.
+
+MAIN approved an operator launcher that injects the gateway configuration and
+current Pi credential into the child environment without printing either.
+The child command is:
+
+```sh
+RELEASE_SMOKE_SCENARIO=discovery-question RELEASE_SMOKE_DIAGNOSTIC=1 node scripts/ai/release-smoke/run.mjs
+```
+
+This mode runs **at most three sequential authenticated non-admin HTTP requests**:
+an ordinary tracked-login request, an ordinary-text answer choosing `login`, then
+the known visits/popular-pages request. It stops after a failed phase; there are
+no inference retries or model fallbacks. The first response must include bounded
+questions, a read progress phase, no draft, and an explanation of the unsupported
+username/login grouping. The follow-up must remain draft-free and explain the
+limitation; the last request must produce a shared-schema-valid metrics/pages
+draft. Questions are display data only and confer no executable authority.
+
+Only disposable synthetic tables are seeded: `login`, `login_page`, and the
+`username` property with `CANARY_INVENTED_USERNAME_NEVER_EXPOSE`. No real analytics
+or production access is involved. The runner rejects that canary anywhere in the
+final result, compares board/report and analytics/session snapshots, and removes
+its containers, network, and temporary environment file in cleanup. All requests
+accept SSE; the parser checks UTF-8, total/frame/progress bounds, a single result,
+strict shared result validation, and clean EOF before considering a draft valid.
+Error frames fail the probe without exposing their contents.
+
+Local verification:
+
+```sh
+npx --yes pnpm@12.3.4 install --frozen-lockfile
+node --test scripts/ai/release-smoke/diagnostic.test.mjs
+node --check scripts/ai/release-smoke/run.mjs
+```
+
+Eight Node tests pass, including categorical discovery observation, fragmented
+canary detection, fragmented UTF-8, optional questions, malformed
+and missing terminals, duplicate/post-terminal frames, error frames, unknown
+question authority, invalid progress, and oversized frames. The mandatory
+`affected-tests --base HEAD` still selects no tests because Vitest excludes `.mjs`;
+its exit 1 is not an application test failure, and is not counted as green proof.
+
+**Actual image run:** exact-model metadata preflight returned 200; both public
+validator hashes matched; image runtime was Node v22.23.4 / Pi 1.4.0; unsigned
+request returned 401. The first signed non-admin discovery request returned 200,
+1405 SSE bytes, one valid terminal, clean EOF, all six progress phases including
+`read`, one bounded question, an honest capability limitation, and no draft.
+Board/report and synthetic analytics/session snapshots remained unchanged.
+The categorical observer witnessed exactly one `analytics_discover` request and
+one proposal. Host-to-native input was observed; the invented canary was absent
+from both that input and observed native output. This observes the protocol
+boundary, not private provider internals. No payloads were emitted.
+
+The immediate follow-up returned **429**: the app retains a 60-second per-user
+admission window even after the first stream ends. The run stopped there; the
+third request was not sent. No retries or fallback were made. This original
+partial receipt is retained at
+`.pi/tasks/01a180e0-deac-7433-8442-6f606ab4d82a-14142/bbf1e0b82.output`.
+
+MAIN then explicitly authorized one additional three-call run with planned
+61-second same-user spacing. That run **passed** in 155 seconds, with no retries,
+fallback or fourth call. Sanitized receipt:
+`.pi/tasks/01a180e0-deac-7433-8442-6f606ab4d82a-14142/bb67edb2e.output`.
+
+| Planned turn | HTTP / SSE bytes | Validated result | Discovery observations |
+| --- | --- | --- | --- |
+| Ordinary tracked-login request | 200 / 1485 | One bounded question, honest limitation, no draft | `analytics_discover`: 1 |
+| Ordinary-text answer selecting login | 200 / 1071 | Honest unsupported-grouping explanation, no draft | `analytics_discover`: 1 |
+| Known visits/popular-pages request | 200 / 1231 | Valid metrics/pages draft | No analytics read requested |
+
+Each stream reached one validated terminal and clean EOF. Each phase preserved
+board/report and analytics/session snapshots. All three native input boundaries
+were observed and all three had canary=false on input and output. No stderr bytes
+or invalid native JSON were observed. Native processes were signalled after
+successful proposal handling; the harness does not claim normal native exit.
+Second-run peak sampled cgroup was 414281728 bytes, lifetime peak 423931904,
+app RSS 301477888, native RSS 69136384. Owned resources were removed.
+
+**Severe immediate clarification UX issue, not fixed here:**
+`src/lib/ai/server.ts:146-149` removes user entries only after expiry, rejects
+`users.has(auth.user.id)` with 429, and sets expiry to `now + 60_000`.
+Stream completion at `:428-430` decrements global `turns` but does not delete the
+user entry; non-stream cleanup at `:463-464` likewise only decrements `turns`.
+Thus the observed immediate answer after a successful question is blocked until
+the original admission expires. The spaced chain proves provider/image/contracts
+integration, **not instant interactive clarification usability**. MAIN must
+separately evaluate and review an in-flight-only admission policy or a bounded
+rate policy permitting clarification before deployment; no server file was changed.
+
+The run removed its owned containers and network. First-turn sampled app cgroup
+peak was 473763840 bytes; lifetime peak 484540416 bytes, app RSS 301793280,
+native RSS 69128192. These are partial-run observations, not new deployment
+sizing recommendations. The new spaced chain is the follow-up/known-metrics
+proof; the historical scripted runs above are separate evidence.
 
 ## Other checks and limits
 
