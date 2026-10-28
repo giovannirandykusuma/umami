@@ -189,6 +189,7 @@ try {
           if (value.type === 'extension_ui_request' && value.method === 'notify') {
             assert.deepEqual(JSON.parse(value.message).sort(), [
               'analytics_breakdown',
+              'analytics_discover',
               'analytics_summary',
               'analytics_timeseries',
               'propose_board',
@@ -212,7 +213,7 @@ try {
     child.stdin.write(JSON.stringify({ id: 'smoke-state', type: 'get_state' }) + '\n');
   });
   assert.equal(stderr, '', 'No extension loading failures');
-  assert.equal(toolProof, true, 'Trusted extension loaded and only four host tools active');
+  assert.equal(toolProof, true, 'Trusted extension loaded and only five host tools active');
   console.log('Pinned Pi 1.4.0 native RPC get_state correlated; no prompt/provider call.');
 } finally {
   child.kill('SIGKILL');

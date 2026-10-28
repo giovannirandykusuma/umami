@@ -59,9 +59,10 @@ It exposes these first-release capabilities:
 - `analytics_summary`
 - `analytics_breakdown`
 - `analytics_timeseries`
+- `analytics_discover` (injected host implementation; metadata only)
 - `propose_board` (proposal only; not persistence)
 
-The three read names are an **initial capability subset, not an aggregate-only
+The four read names are an **initial capability subset, not an aggregate-only
 permission policy**. Full authorized analytics is allowed by the product contract;
 future explicit tools can expand this subset. There are no shell/filesystem/code,
 board save/delete/share/permission tools. Parameters are bounded JSON objects;
@@ -69,9 +70,67 @@ the authenticated host's injected `executeTool` MUST validate per-tool arguments
 recheck website/account authorization on every read, and bound returned data.
 No user or assistant identities are accepted in conversation records. Analytics
 strings and history are untrusted data, not instructions. Model text is not
-forwarded as raw HTML or logged. Status events are fixed bounded values.
-`propose_board` returns a bounded plain message and optional draft; the host uses
-the real strict `validateBoardDraft` validator before returning. Nothing saves it.
+forwarded as raw HTML or logged. Progress events are fixed bounded values.
+`propose_board` returns `{message,draft?,questions?}`. The public pure
+`validateAiResult` boundary rejects non-JSON prototypes/accessors, unknown keys,
+markup/control characters and oversized UTF-8 output (32 KiB), and uses the real
+strict `validateBoardDraft` validator. Nothing saves it.
+
+### Contract for the next host/stream slice
+
+```ts
+interface AiQuestion {
+  id: string;
+  question: string;
+  options?: { label: string; value: string }[];
+}
+interface AiResult {
+  message: string;
+  draft?: BoardParameters;
+  questions?: AiQuestion[];
+}
+type AiPhase = 'start' | 'check' | 'read' | 'prepare' | 'validate' | 'complete';
+type AiEvent =
+  | { type: 'progress'; phase: AiPhase }
+  | { type: 'result'; result: AiResult }
+  | { type: 'error'; error: string };
+```
+
+These types and `aiQuestionsSchema`, `aiResultSchema`, `analyticsDiscoverSchema`,
+`validateAnalyticsDiscoverArgs` and `validateAiResult` are exported from
+`src/lib/ai/rpc/contract.ts`; runtime also re-exports the event/result types.
+The runtime callback emits **progress only**: start after child launch, check
+when host input/configuration/isolation checks have passed, read when an accepted
+host read is dispatched (repeatable), prepare when a final proposal arrives,
+validate only after strict proposal validation, complete only after correlated
+prompt acknowledgement, settled-not-aborted and no pending reads. No timer,
+percentage, reasoning, tokens, IDs, tool arguments or analytics payloads enter
+callbacks. Optional reads mean phases can be skipped. Observer exceptions cannot
+affect settlement. Rejection/cancellation/timeout never emits complete; callbacks
+stop after settlement, including late host reads. The promise remains the sole
+terminal result/error source: the future HTTP adapter must reauthorize and
+validate it before emitting one `result` or sanitized `error` SSE envelope.
+Nonstream callers retain the same promise/JSON result shape without required new
+fields. This slice does not implement HTTP streaming or host question handling.
+
+Questions are 1..3 records with unique safe 1..64-character IDs (excluding
+prototype keys), nonblank question text <=500 units, optional 1..6 options with
+nonblank labels/values <=120 units, unique labels and values. Message <=2000
+units. Strings are untrusted display text; options contain no action fields and
+must never be interpreted as executable actions, authentication or permission.
+Follow-up answers are ordinary bounded user messages, reauthorized each turn.
+Question content is not a substitute for a supported renderer or query contract.
+
+Discovery arguments are exactly `{websiteId,startAt,endAt}`: strict UUID and
+integer Unix milliseconds in 0..8,640,000,000,000,000, ordered non-future range at
+most 31 days (same host bounds, including equal endpoints). Runtime validates
+before invoking the injected host. The host must still authorize before/after
+every read and enforce its own deadline/budget. Discovery's future host result
+must contain only bounded event names/counts, property names/types and verifiable
+aggregate coverage: never property values, identifiers, raw events or samples.
+Metadata is potentially sensitive and untrusted; event names do not establish
+login-success semantics. No direct model DB access or ambient skill loading is
+introduced. The dedicated trusted guidance/playbook remains a later slice.
 
 Limits: 24 conversation messages, 32 KiB input, 256 KiB total stdout and stderr
 (each), 32 KiB tool args/results, 8 reads, 12 turns, 45 seconds, 2 active children

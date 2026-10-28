@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AI_LIMITS, runAiTurn, runIsolatedTurn, type AiEvent } from './runtime';
 import { gatewayConfig, permissionArgs, reasoningLevel } from './rpc/confinement.mjs';
+import { validateAiResult, validateAnalyticsDiscoverArgs } from './rpc/contract';
 
 const bridge = resolve('src/lib/ai/rpc/fixture.mjs');
 const executeTool = vi.fn(async () => ({ ok: true }));
@@ -48,6 +49,28 @@ describe('model-facing tool contracts', () => {
     const websiteId = '11111111-1111-4111-8111-111111111111';
     const dates = { websiteId, startAt: 0, endAt: 1000 };
     expect(Value.Check(tools.analytics_summary.parameters, dates)).toBe(true);
+    expect(Value.Check(tools.analytics_discover.parameters, dates)).toBe(true);
+    for (const args of [
+      { ...dates, values: true },
+      { ...dates, startAt: -1 },
+      { ...dates, endAt: 1.5 },
+      {},
+    ])
+      expect(Value.Check(tools.analytics_discover.parameters, args)).toBe(false);
+    expect(
+      Value.Check(tools.propose_board.parameters, {
+        message: 'Clarify',
+        questions: [
+          { id: 'event', question: 'Which event?', options: [{ label: 'Other', value: 'other' }] },
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      Value.Check(tools.propose_board.parameters, {
+        message: 'Clarify',
+        questions: [{ id: 'event', question: 'Which event?', action: 'execute' }],
+      }),
+    ).toBe(false);
     expect(Value.Check(tools.analytics_summary.parameters, { ...dates, userId: 'forged' })).toBe(
       false,
     );
@@ -101,6 +124,160 @@ describe('model-facing tool contracts', () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+describe('strict clarification and discovery boundaries', () => {
+  const question = {
+    id: 'event',
+    question: 'Which event means a successful login?',
+    options: [{ label: 'Unknown', value: 'unknown' }],
+  };
+  it('returns detached display-only questions and preserves message-only JSON compatibility', () => {
+    const input = { message: 'Please clarify.', questions: [question] };
+    const result = validateAiResult(input);
+    expect(result).toEqual(input);
+    expect(result.questions).not.toBe(input.questions);
+    expect(result.questions![0].options).not.toBe(question.options);
+    expect(validateAiResult({ message: 'Not supported.' })).toEqual({ message: 'Not supported.' });
+  });
+  it.each([
+    [],
+    [question, question],
+    Array(4).fill(question),
+    [{ ...question, id: '__proto__' }],
+    [{ ...question, id: 'constructor' }],
+    [{ ...question, question: '' }],
+    [{ ...question, question: 'x'.repeat(501) }],
+    [{ ...question, question: '<script>execute()</script>' }],
+    [{ ...question, action: 'save' }],
+    [{ ...question, options: [] }],
+    [{ ...question, options: Array(7).fill({ label: 'a', value: 'b' }) }],
+    [
+      {
+        ...question,
+        options: [
+          { label: 'a', value: 'same' },
+          { label: 'b', value: 'same' },
+        ],
+      },
+    ],
+    [{ ...question, options: [{ label: 'a', value: 'x'.repeat(121) }] }],
+    [{ ...question, options: [{ label: 'a', value: 'b', action: { url: 'https://invalid' } }] }],
+  ])('rejects malformed questions %#', questions => {
+    expect(() => validateAiResult({ message: 'Clarify', questions })).toThrow();
+  });
+  it('rejects inherited objects, accessors, prototype keys and oversized UTF-8 results', () => {
+    const getter = vi.fn(() => 'secret');
+    for (const value of [
+      Object.assign(Object.create({ authority: true }), { message: 'x' }),
+      {
+        get message() {
+          return getter();
+        },
+      },
+      JSON.parse('{"message":"x","__proto__":{}}'),
+      {
+        message: 'x',
+        questions: [
+          { ...question, options: [JSON.parse('{"label":"a","value":"b","prototype":{}}')] },
+        ],
+      },
+      { message: 'x', draft: { text: '😀'.repeat(10_000) } },
+    ])
+      expect(() => validateAiResult(value)).toThrow();
+    expect(getter).not.toHaveBeenCalled();
+  });
+  it('matches strict host UUID/date/cost bounds without granting identity authority', () => {
+    const args = { websiteId: '11111111-1111-4111-8111-111111111111', startAt: 0, endAt: 1000 };
+    expect(validateAnalyticsDiscoverArgs(args, 1000)).toEqual(args);
+    expect(validateAnalyticsDiscoverArgs({ ...args, endAt: 0 }, 1000)).toHaveProperty('endAt', 0);
+    for (const value of [
+      { ...args, userId: 'forged' },
+      { ...args, websiteId: 'invalid' },
+      { ...args, startAt: -1 },
+      { ...args, endAt: 1.5 },
+      { ...args, startAt: 1001 },
+      { ...args, endAt: 1001 },
+      { ...args, endAt: 32 * 86_400_000 },
+    ])
+      expect(() => validateAnalyticsDiscoverArgs(value, 1000)).toThrow();
+  });
+  it('validates native proposals before output, correlates discovery, and suppresses late reads after cancel', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ai-clarification-'));
+    const path = join(directory, 'fixture.mjs');
+    await writeFile(
+      path,
+      `
+      import { createInterface } from 'node:readline';
+      const send = value => process.stdout.write(JSON.stringify(value) + '\\n');
+      createInterface({ input: process.stdin }).on('line', line => {
+        const value = JSON.parse(line);
+        if (value.type === 'prompt') {
+          const mode = JSON.parse(value.message.split('\\n').slice(1).join('\\n')).messages[0].content;
+          globalThis.mode = mode;
+          send({ type: 'response', id: 'turn-1', command: 'prompt', success: true, data: { disposition: 'started' } });
+          send({ type: 'message_update', secret: 'private reasoning' });
+          send({ type: 'extension_ui_request', method: 'input', title: 'umami-host-tool', id: 'read-1', placeholder: JSON.stringify({ name: 'analytics_discover', args: { websiteId: '11111111-1111-4111-8111-111111111111', startAt: 0, endAt: 1000 } }) });
+        } else if (value.id === 'read-1') {
+          const proposal = { message: 'Clarify.', questions: [{ id: 'event', question: 'Which event?' }] };
+          if (globalThis.mode === 'invalid') proposal.questions[0].action = 'save';
+          if (globalThis.mode === 'oversize') proposal.questions[0].question = 'x'.repeat(501);
+          send({ type: 'extension_ui_request', method: 'input', title: 'umami-host-tool', id: 'final-1', placeholder: JSON.stringify({ name: 'propose_board', args: proposal }) });
+          if (globalThis.mode === 'duplicate') send({ type: 'extension_ui_request', method: 'input', title: 'umami-host-tool', id: 'final-2', placeholder: JSON.stringify({ name: 'propose_board', args: proposal }) });
+          send({ type: 'agent_settled', aborted: false });
+        }
+      });
+    `,
+    );
+    const events: AiEvent[] = [];
+    const run = (mode: string, extra = {}) =>
+      runIsolatedTurn(
+        {
+          messages: [{ role: 'user', content: mode }],
+          executeTool,
+          onEvent: event => events.push(event),
+          ...extra,
+        },
+        { bridge: path, env: {}, timeoutMs: 1000 },
+      );
+    try {
+      await expect(run('valid')).resolves.toEqual({
+        message: 'Clarify.',
+        questions: [{ id: 'event', question: 'Which event?' }],
+      });
+      expect(executeTool).toHaveBeenCalledWith('analytics_discover', {
+        websiteId: '11111111-1111-4111-8111-111111111111',
+        startAt: 0,
+        endAt: 1000,
+      });
+      expect(events).toEqual(
+        ['start', 'check', 'read', 'prepare', 'validate', 'complete'].map(phase => ({
+          type: 'progress',
+          phase,
+        })),
+      );
+      for (const mode of ['invalid', 'oversize', 'duplicate'])
+        await expect(run(mode)).rejects.toThrow('protocol');
+      const controller = new AbortController();
+      let release!: (value: unknown) => void;
+      const pending = run('valid', {
+        signal: controller.signal,
+        executeTool: () => {
+          controller.abort();
+          return new Promise(resolve => {
+            release = resolve;
+          });
+        },
+      });
+      await expect(pending).rejects.toThrow('cancelled');
+      const snapshot = [...events];
+      release({ private: 'late metadata' });
+      await Promise.resolve();
+      expect(events).toEqual(snapshot);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -234,8 +411,11 @@ describe('bounded isolated AI runtime (synthetic RPC only)', () => {
       turn('success', { onEvent: (event: AiEvent) => events.push(event) }),
     ).resolves.toEqual({ message: 'A bounded suggestion.' });
     expect(events).toEqual([
-      { type: 'status', status: 'started' },
-      { type: 'status', status: 'completed' },
+      { type: 'progress', phase: 'start' },
+      { type: 'progress', phase: 'check' },
+      { type: 'progress', phase: 'prepare' },
+      { type: 'progress', phase: 'validate' },
+      { type: 'progress', phase: 'complete' },
     ]);
     await expect(turn('end-only', {}, 100)).rejects.toThrow('timeout');
     await expect(turn('settled-first')).resolves.toHaveProperty('message');
