@@ -63,3 +63,7 @@ Image sha256:c0bec0a4 (source 4f3e6fbfe pushed). Live cx/gpt-6.1-sol medium, inv
 ## [2026-10-28] 20261028-2005/assistant-followup-fix | BLOCKED → env setup granted
 
 Worker fix done (session cwd rebase, fake-Pi cwd enforcement + regression, bounded exit diagnostic, live Thinking/Working timer; 52 scoped tests pass) but tsc printed 41: fresh worktree lacked generated Prisma client/package builds. MAIN granted gitignored setup (install, prisma generate, package builds); screenshots deferred to MAIN on rebuilt image.
+
+## [2026-10-28] global-assistant | Live synthetic test PASSED
+
+Image sha256:4ba40d12 (source 329890ccf, pushed). Real cx/gpt-6.1-sol medium, invented data: turn 1 built "Apps compare" board with 3-site WebsiteCompareChart (GET /api/websites, show_chart, POST /api/boards, open_link, 71 text deltas); turn 2 (follow-up in same chat, restored Pi session) GET /api/boards then DELETE emitted confirm, reply rejected (200) → tool denied, board survived; history 4 messages; 401 unauth; foreign chat 404; 260 MiB/1 GiB. Thinking text: gateway sends none (live activity row instead, per Randy).
