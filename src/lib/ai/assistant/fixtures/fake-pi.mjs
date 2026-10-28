@@ -1,4 +1,4 @@
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 const args = process.argv.slice(2);
@@ -6,11 +6,23 @@ const dir = args[args.indexOf('--session-dir') + 1];
 const session = args.includes('--session')
   ? args[args.indexOf('--session') + 1]
   : join(dir, 'test.jsonl');
+if (args.includes('--session')) {
+  const header = JSON.parse(readFileSync(session, 'utf8').split('\n')[0]);
+  if (!existsSync(header.cwd)) {
+    process.stderr.write(`Stored session working directory does not exist: ${header.cwd}\n`);
+    process.exit(1);
+  }
+}
 const emit = value => process.stdout.write(JSON.stringify(value) + '\n');
 createInterface({ input: process.stdin }).on('line', line => {
   const request = JSON.parse(line);
   if (request.type === 'prompt') {
-    if (!args.includes('--session')) writeFileSync(session, '{"type":"session","id":"test"}\n');
+    if (!args.includes('--session'))
+      writeFileSync(session, JSON.stringify({ type: 'session', version: 3, id: 'test', cwd: process.cwd() }) + '\n');
+    if (request.message === 'startup-error') {
+      process.stderr.write('Stored session working directory does not exist: /private/path\nsecret-token\n');
+      process.exit(1);
+    }
     appendFileSync(session, JSON.stringify({ type: 'message', text: request.message }) + '\n');
     emit({ type: 'response', id: request.id, command: 'prompt', success: true });
     if (request.message === 'hang') return;

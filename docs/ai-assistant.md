@@ -25,7 +25,12 @@ The Docker runner already copies scripts, so no Dockerfile change is needed.
 
 Each turn restores the chat's Pi JSONL into a private temporary session directory,
 streams text/thinking and tool events, saves the updated session, and removes the
-temporary directory. Session snapshots over 2 MiB are dropped whole rather than
+temporary directory. On restoration, only the session header's `cwd` is rebased
+onto the new scratch directory: Pi 1.4.0 rejects sessions whose original working
+directory has been deleted. Session IDs and subsequent JSONL entries are retained.
+Unexpected child exits include their exit code and an allowlisted startup diagnostic
+from a bounded stderr buffer; arbitrary stderr and private paths are not exposed.
+Session snapshots over 2 MiB are dropped whole rather than
 slicing JSONL and leaving dangling parent IDs. The visible persisted transcript
 is retained even if the model's native context is dropped. Cancelled and failed
 turns also persist their assistant timeline and any available session snapshot.
@@ -60,8 +65,14 @@ cannot finalize a running assistant message. The old board-chat flow is unchange
 
 ## Verification
 
+The Assistant shows an elapsed activity row while a turn is active: `Thinking… Ns`
+before text or tools, then `Working… Ns`. It is activity, not fabricated reasoning;
+real thinking deltas still render in the existing collapsible thinking parts.
+
 Offline tests launch a fake native RPC subprocess for streaming, tool exchange,
-session restoration, cancellation and deadline behavior. Handler tests cover
+session restoration across deleted scratch directories, safe startup diagnostics,
+cancellation and deadline behavior. The fake enforces Pi's session-cwd existence
+check. UI fake-timer tests cover activity ticks, label changes and timer cleanup. Handler tests cover
 ownership, authentication, persistence, concurrency and stream cancellation.
 Host tool tests exercise path guards, delete approval/denial/expiry and questions.
 The extension's Node tests use real lockfile-installed TypeBox schemas but no

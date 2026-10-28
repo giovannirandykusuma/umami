@@ -54,7 +54,18 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
     await mkdir(sessions);
     const restored = boundedSession(input.session);
     const sessionPath = join(sessions, 'restored.jsonl');
-    if (restored) await writeFile(sessionPath, restored, { mode: 0o600 });
+    if (restored) {
+      // Pi validates the header cwd before loading a session. Each turn has a new
+      // scratch directory; the previous turn's directory has already been removed.
+      const newline = restored.indexOf('\n');
+      const header = JSON.parse(newline < 0 ? restored : restored.slice(0, newline));
+      if (header.type !== 'session') throw new Error('Invalid assistant session header');
+      await writeFile(
+        sessionPath,
+        JSON.stringify({ ...header, cwd: directory }) + (newline < 0 ? '\n' : restored.slice(newline)),
+        { mode: 0o600 },
+      );
+    }
     const native = options.bridge === resolve('scripts/ai/native.mjs');
     const extension = resolve('scripts/ai/assistant-tools.mjs');
     if (native)
@@ -129,6 +140,7 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
         let bridges = 0;
         let bytes = 0;
         let stderrBytes = 0;
+        let diagnostics = '';
         let buffer = '';
         const seen = new Set<string>();
         const pending = new Set<string>();
@@ -155,8 +167,16 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
         };
         child.on('error', () => finish(new Error('Assistant process failed')));
         child.stdin.on('error', () => finish(new Error('Assistant transport failed')));
-        child.once('close', () => finish(new Error('Assistant exited before settlement')));
+        child.once('close', code => {
+          // Only expose known startup diagnostics, never arbitrary child output
+          // (which can contain credentials, prompts, or tool data).
+          const detail = diagnostics.includes('Stored session working directory does not exist:')
+            ? ': Stored session working directory does not exist'
+            : '';
+          finish(new Error(`Assistant exited before settlement (exit ${code})${detail}`));
+        });
         child.stderr.on('data', (chunk: Buffer) => {
+          diagnostics = (diagnostics + chunk.toString('utf8')).slice(0, 4096);
           stderrBytes += chunk.length;
           if (stderrBytes > 1024 * 1024) finish(new Error('Assistant diagnostics exceeded limit'));
         });

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { applyAssistantEvent } from '@/lib/ai/assistant/protocol';
-import { historyGroup, Part } from './AssistantPage';
+import { Activity, historyGroup, Part } from './AssistantPage';
 import { readAssistantStream } from './stream';
 
 vi.mock('../boards/[boardId]/BoardComponentRenderer', () => ({
@@ -9,6 +9,45 @@ vi.mock('../boards/[boardId]/BoardComponentRenderer', () => ({
 }));
 
 describe('assistant timeline', () => {
+  it('ticks live activity from send time, switches after text/tools, and stops on unmount', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-28T12:00:00Z'));
+    const startedAt = Date.now();
+    try {
+      const view = render(<Activity startedAt={startedAt} parts={[]} />);
+      expect(screen.getByRole('status').textContent).toContain('Thinking… 0s');
+      act(() => vi.advanceTimersByTime(12000));
+      expect(screen.getByRole('status').textContent).toContain('Thinking… 12s');
+      view.rerender(
+        <Activity startedAt={startedAt} parts={[{ type: 'text', id: 't', text: 'Hi' }]} />,
+      );
+      expect(screen.getByRole('status').textContent).toContain('Working… 12s');
+      view.rerender(
+        <Activity
+          startedAt={startedAt}
+          parts={[
+            {
+              type: 'tool',
+              id: 'tool',
+              name: 'stats',
+              title: 'Get stats',
+              args: {},
+              status: 'running',
+            },
+          ]}
+        />,
+      );
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.getByRole('status').textContent).toContain('Working… 13s');
+      view.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+      const next = render(<Activity startedAt={Date.now()} parts={[]} />);
+      expect(screen.getByRole('status').textContent).toContain('Thinking… 0s');
+      next.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('groups history by local calendar day', () => {
     const now = new Date(2026, 9, 28, 12);
     expect(historyGroup(new Date(2026, 9, 28).toISOString(), now)).toBe('Today');

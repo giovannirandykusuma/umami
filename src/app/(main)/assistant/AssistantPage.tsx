@@ -49,6 +49,23 @@ async function request(path: string, method = 'GET', data?: unknown, signal?: Ab
   return response;
 }
 
+export function Activity({ startedAt, parts }: { startedAt: number; parts: AssistantPart[] }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
+  const thinking = !parts.some(part => part.type === 'tool' || (part.type === 'text' && part.text));
+  return (
+    <div role="status" className={styles.muted}>
+      <span aria-hidden="true" className={styles.pulse}>
+        ●{' '}
+      </span>
+      {thinking ? 'Thinking' : 'Working'}… {Math.max(0, Math.floor((now - startedAt) / 1000))}s
+    </div>
+  );
+}
+
 export function historyGroup(date: string, now = new Date()) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today);
@@ -62,6 +79,7 @@ export function AssistantPage() {
   const [chat, setChat] = useState<AssistantChat | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [startedAt, setStartedAt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [history, setHistory] = useState(false);
@@ -137,6 +155,7 @@ export function AssistantPage() {
   async function send() {
     if (!draft.trim() || busy || loading) return;
     const text = draft.trim();
+    setStartedAt(Date.now());
     setBusy(true);
     setError('');
     follow.current = true;
@@ -261,6 +280,7 @@ export function AssistantPage() {
     }
   }
 
+  const latest = chat?.messages.at(-1);
   return (
     <PageBody>
       <Column className={styles.page}>
@@ -417,9 +437,10 @@ export function AssistantPage() {
                   ))
                 )}
                 {busy && (
-                  <div role="status" className={styles.muted}>
-                    Working<span className={styles.pulse}> ···</span>
-                  </div>
+                  <Activity
+                    startedAt={startedAt}
+                    parts={latest?.role === 'assistant' ? latest.parts : []}
+                  />
                 )}
               </div>
             </div>
