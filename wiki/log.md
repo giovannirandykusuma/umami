@@ -35,3 +35,7 @@ Randy authorized app-only rollout of published b841d010d (immediate no-wait thre
 ## [2026-10-28] spec/global-assistant | rung epic · 3 lanes · ambiguity 0.15
 
 Randy: page-only Assistant outside Boards, history+delete, act-as-user with delete confirm and questions, full collapsed thinking, multi-site compare chart. MAIN committed protocol contract src/lib/ai/assistant/protocol.ts. Mobbin refs in shots/refs/assistant (local).
+
+## [2026-10-28] 20261028-1700/compare-chart | DECIDE: widen to BoardComponentSelect
+
+Worker paused: no multi-website ConfigField in manual editor. MAIN approved widening Owns to BoardComponentSelect.tsx (+test) for a validated 2–10 websiteIds field; scalar fields unchanged. Disjoint from assistant-backend (no src/app).
