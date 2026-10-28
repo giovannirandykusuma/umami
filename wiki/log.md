@@ -75,3 +75,7 @@ Worker blocked on absent worktree dependencies. MAIN approved an untracked workt
 ## [2026-10-28] 20261028-2005/assistant-chart-range | Explicit chart range fix merged
 
 Merged 7db2d4921 after fresh judge ACCEPT: 236 affected tests passed, targeted chart/prompt/tool tests passed, baseline substitution failed both new range regression cases as expected. Merged-tree gate passed. Explicit millisecond startAt/endAt now control comparison API requests and timezone-adjusted axis; absent or invalid ranges retain global board selection. Prompt removes unsupported visits metric. Rebuilding release image before final live verification; production unchanged.
+
+## [2026-10-28] 20261028-2005/direct | Corrected image live verification passed
+
+Image sha256:54b018e35943b80f432cd3779bc3acc5dd293697d5111a7ab6c25b005936bdd8 (source 7db2d4921) passed real-gateway synthetic smoke: three-site board creation, streamed text, follow-up delete confirmation rejected, board survives, four persisted messages; memory 279.8 MiB / 1 GiB. Evidence .pi/tasks/assistant-live-corrected.txt. Real browser shows full October 15–28 comparison with three labeled lines (shots/live/corrected-range.png). Additional browser turn captured Thinking... 0s then successful websites list (corrected-live-timer.png and corrected-live-timer-later.png); elapsed increment not separately captured. Mobile history drawer/menu visually verified in prior same-UI image. Production unchanged; awaiting deployment consent, with fresh backup and migration 27 required.
