@@ -13,6 +13,9 @@ exactly one pageview before issuing `propose_board`.
 Run only against the owned local fixture:
 
 ```sh
+NODE22_DIR=$(npx --yes --package=node@22.23.4 -c 'dirname "$(command -v node)"')
+export PATH="$NODE22_DIR:$PATH"
+node --version # v22.23.4
 sh scripts/ai/synthetic-engines/setup.sh
 DATABASE_URL='postgresql://ai_synthetic@127.0.0.1:25432/ai_synthetic?schema=integration' \
   npx --yes pnpm@12.3.4 exec prisma generate
@@ -41,8 +44,16 @@ of ClickHouse endpoint parity. Browser new/edit behavior remains separate UI wor
 The sole mocked primitive is `node:child_process.spawn`: it validates the native
 bridge path, expected provider and isolation flags, then calls real spawn with
 only an additional absolute `--extension` pointing at
-`scripts/ai/integration/provider.mjs`. Original executable, arguments, cwd, stdio
-and isolated environment are preserved. Unexpected launches fail assertions.
+`scripts/ai/integration/provider.mjs` and an exact Node filesystem read grant for
+that single trusted test asset. Original executable, Node permission arguments,
+host-tools extension, `--thinking medium`, system guidance, cwd, stdio and isolated
+environment are preserved and checked against the current launch contract. Guard
+mutations cover extra arguments/permissions, extension paths, provider, model,
+reasoning, environment and shell injection; request provider/model fields are
+rejected by the real strict host schema. Payload-free provider markers distinguish
+actual SQL success, proposal, model error and waiting cancellation from startup
+failure. Fixture timestamps are recent and analytics ranges come from host context,
+not historical dates. Unexpected launches fail assertions.
 There is no fake RPC child, canned runtime callback, mocked identity/permission/SQL,
 or injected host response. The explicitly trusted TEST extension registers an
 in-process deterministic provider and emits model stream events consumed by Pi's
@@ -60,12 +71,15 @@ calls are needed. Pi `--offline` alone is not a network sandbox.
 ## Source constraint resolved by explicit test composition
 
 `runAiTurn.configuration()` accepts only the explicit installation, provider,
-model, key and egress settings. `runIsolatedTurn` creates a fresh private HOME,
-writes only `agent/auth.json`, and executes native CLI RPC with discovery disabled
-and exactly one explicit extension, `scripts/ai/host-tools.mjs`. That extension
-registers tools, not providers. No custom `models.json`, provider extension, or
-ambient developer configuration reaches the child. Selecting an invented provider
-therefore cannot run a turn. `--offline` prevents discovery/update work; it is not
+model, HTTPS gateway base URL, key, egress origin and reasoning settings.
+`runIsolatedTurn` creates a fresh private HOME, writes a host-constructed
+`agent/models.json` (mode 0600), and executes native CLI RPC under Node permissions
+with discovery disabled and exactly one explicit extension,
+`scripts/ai/host-tools.mjs`. That extension registers tools, not providers.
+No caller-supplied models configuration, provider extension or ambient developer
+configuration reaches the child. The test configures `https://synthetic.invalid`
+as the gateway/origin and registers its scripted provider only through the trusted
+test extension; no live gateway call occurs. `--offline` prevents discovery/update work; it is not
 a synthetic model engine or an OS-level network firewall. Stock built-in provider
 selection must not be used as an alleged credential-free offline integration test.
 
@@ -99,8 +113,8 @@ Freeze the resulting transitive lockfile and image digest. Set `AI_PI_ROOT=/opt/
 ## Deployment requirements (not supplied by these tests)
 
 Required server settings are `AI_ENABLED`, absolute `AI_PI_ROOT`, `AI_PROVIDER`,
-`AI_MODEL`, `AI_PROVIDER_KEY`, and comma-separated HTTPS origins in
-`AI_EGRESS_ORIGINS`. Pi must match the package name and version pinned by
+`AI_MODEL`, `AI_BASE_URL`, `AI_PROVIDER_KEY`, and the matching single HTTPS origin in
+`AI_EGRESS_ORIGINS`. Optional `AI_REASONING_LEVEL` defaults to `medium`. Pi must match the package name and version pinned by
 `scripts/ai/native.mjs` (currently 1.4.0). Provider/model choices are server-owned,
 not browser input. Install only reviewed trusted runtime code and extension assets.
 
@@ -113,13 +127,13 @@ proxy behavior and the actual provider transport under deployment network policy
 Use a read-only installation and application filesystem with a bounded writable
 ephemeral temp volume. Do not mount personal homes, credential stores, SSH agents,
 cloud credentials, project secrets or persistent Pi session directories. Runtime
-creates a private per-turn HOME and removes it after killing the child; its auth
-file is mode 0600. That lifecycle is not equivalent to kernel filesystem isolation.
+creates a private per-turn HOME and removes it after killing the child; its gateway
+models file is mode 0600. That lifecycle is not equivalent to kernel filesystem isolation.
 Keep the provider key in server secret storage, rotate it, and avoid prompt,
 analytics, cookie, key, tool-result and child diagnostic logging. Enforce resource
 limits and observe only sanitized operational signals.
 
-First-release tools are `analytics_summary`, `analytics_breakdown`, and
+Host tools are `analytics_discover`, `analytics_summary`, `analytics_breakdown`, and
 `analytics_timeseries`, plus the non-persisting `propose_board`. This is a documented
 capability subset, not coverage of every analytics query. Host authorization must
 apply to every read and every referenced entity; the model is not an authorization

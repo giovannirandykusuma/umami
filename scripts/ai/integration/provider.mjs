@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai';
 
 export default function (pi) {
+  process.stderr.write('LEGACY_TEST:ready\n');
   pi.registerProvider('umami-synthetic', {
     baseUrl: 'https://synthetic.invalid',
     apiKey: 'synthetic-not-a-credential',
@@ -46,25 +47,38 @@ export default function (pi) {
               : user.content.map(c => c.text || '').join('');
           const payload = JSON.parse(text.slice(text.indexOf('\n') + 1));
           const scenario = JSON.parse(payload.messages.at(-1).content);
+          assert.ok(['success', 'denied-proposal', 'wait', 'error'].includes(scenario.mode));
+          assert.ok(payload.context.websiteIds.every(id => typeof id === 'string'));
+          assert.ok(payload.context.endAt <= payload.context.now);
+          assert.ok(payload.context.startAt < payload.context.endAt);
           if (scenario.mode === 'wait') {
+            process.stderr.write('LEGACY_TEST:waiting\n');
             await new Promise(resolve => {
               if (options.signal.aborted) resolve();
               else options.signal.addEventListener('abort', resolve, { once: true });
             });
             throw new Error('Synthetic cancelled');
           }
-          if (scenario.mode === 'error') throw new Error('Synthetic model failure');
+          if (scenario.mode === 'error') {
+            process.stderr.write('LEGACY_TEST:modelError\n');
+            throw new Error('Synthetic model failure');
+          }
           const results = context.messages.filter(m => m.role === 'toolResult');
           let name;
           let args;
           if (!results.length) {
             name = 'analytics_summary';
-            args = { websiteId: scenario.websiteId, startAt: 1704067200000, endAt: 1704153599999 };
+            args = {
+              websiteId: scenario.websiteId,
+              startAt: payload.context.startAt,
+              endAt: payload.context.endAt,
+            };
           } else if (results.length === 1) {
             assert.equal(results[0].toolName, 'analytics_summary');
             assert.equal(results[0].isError, false);
             const data = JSON.parse(results[0].content.map(c => c.text || '').join(''));
             assert.equal(data.pageviews, 1);
+            process.stderr.write('LEGACY_TEST:read\n');
             name = 'propose_board';
             const draft = payload.draft || {
               rows: [
@@ -94,6 +108,7 @@ export default function (pi) {
           }
           stream.push({ type: 'start', partial: message });
           if (name) {
+            if (name === 'propose_board') process.stderr.write('LEGACY_TEST:proposed\n');
             const block = {
               type: 'toolCall',
               id: `synthetic-${results.length}`,
@@ -118,6 +133,8 @@ export default function (pi) {
           }
           stream.push({ type: 'done', reason: message.stopReason, message });
         } catch (error) {
+          if (!options.signal?.aborted && error.message !== 'Synthetic model failure')
+            process.stderr.write('LEGACY_TEST:failed\n');
           message.stopReason = options.signal?.aborted ? 'aborted' : 'error';
           message.errorMessage = error.message;
           stream.push({ type: 'error', reason: message.stopReason, error: message });
