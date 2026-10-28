@@ -71,3 +71,7 @@ Image sha256:4ba40d12 (source 329890ccf, pushed). Real cx/gpt-6.1-sol medium, in
 ## [2026-10-28] 20261028-2005/assistant-chart-range | Verification dependency provisioning
 
 Worker blocked on absent worktree dependencies. MAIN approved an untracked worktree-local node_modules symlink to the existing main dependency tree solely for tests, without installs or mutations of shared dependencies, to be removed after verification. No product scope expansion or deployment permission. Prior missing dark-mode legend report was disproved in the live browser: all three website labels are visible below the chart (shots/live/chart-legend-check.png).
+
+## [2026-10-28] 20261028-2005/assistant-chart-range | Explicit chart range fix merged
+
+Merged 7db2d4921 after fresh judge ACCEPT: 236 affected tests passed, targeted chart/prompt/tool tests passed, baseline substitution failed both new range regression cases as expected. Merged-tree gate passed. Explicit millisecond startAt/endAt now control comparison API requests and timezone-adjusted axis; absent or invalid ranges retain global board selection. Prompt removes unsupported visits metric. Rebuilding release image before final live verification; production unchanged.
