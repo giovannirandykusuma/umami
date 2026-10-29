@@ -69,6 +69,8 @@ export type AssistantPart =
       durationMs?: number;
     }
   | { type: 'chart'; id: string; title?: string; component: BoardComponentConfig }
+  /** Chart of a host-executed query result (never model-authored data). Whole part ≤ 8 KiB. */
+  | { type: 'result-chart'; id: string; title?: string; kind: AssistantChartKind; series: AssistantSeries }
   | { type: 'link'; id: string; label: string; href: string }
   | {
       type: 'confirm';
@@ -86,6 +88,46 @@ export type AssistantPart =
       state: 'pending' | 'answered' | 'expired';
       answer?: string;
     };
+
+export type AssistantChartKind = 'line' | 'bar' | 'table';
+
+/** Series metrics the host can compute; anything else is `unsupported_metric`. */
+export type AssistantSeriesMetric = 'pageviews' | 'visitors' | 'events';
+
+/** One host-computed series, identical to what the model was told (same resultId). */
+export interface AssistantSeries {
+  /** Human label, e.g. "Tracked clicks · u_1". */
+  label: string;
+  metric: AssistantSeriesMetric;
+  unit: 'hour' | 'day' | 'month';
+  /** Unix milliseconds, inclusive range the query used. */
+  range: { startAt: number; endAt: number };
+  timezone: string;
+  /** Exactly the filters applied by the host, for display. */
+  appliedFilters: Record<string, string>;
+  /** ≤ 400 buckets; `t` is the bucket start as ISO-8601 in `timezone`. */
+  buckets: { t: string; y: number }[];
+  total: number;
+}
+
+/** Structured tool failure returned to the model (never raw HTML/stack bodies). */
+export interface AssistantToolError {
+  ok: false;
+  status?: number;
+  code:
+    | 'http_error'
+    | 'unsupported_filter'
+    | 'unsupported_metric'
+    | 'invalid_chart'
+    | 'unknown_result'
+    | 'result_too_large'
+    | 'invalid_arguments'
+    | 'denied';
+  message: string;
+  /** JSON path of the offending argument, e.g. "component.props.websiteId". */
+  path?: string;
+  retryable: boolean;
+}
 
 /**
  * SSE frames: `event: <type>\ndata: <json>\n\n`. Deltas append to the part with the same id;
