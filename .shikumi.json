@@ -10,6 +10,7 @@
     "main": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
     "worker": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
     "worker-hard": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
+    "worker-alt": { "model": "cc/claude-opus-5-5", "thinking": "low" },
     "judge": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
     "probe": { "model": "cx/gpt-6.1-sol", "thinking": "medium" },
     "ui-judge": { "model": "cx/gpt-6.1-sol", "thinking": "medium" }

@@ -1,5 +1,7 @@
 # Project knowledge
 
+- [Analyst dashboard lifecycle](specs/analyst-dashboard-lifecycle.md) — approved ordered build; unchanged copy from Ashiato `wiki/specs/analyst-dashboard-lifecycle.md`, source commit `e162c7b`.
+
 - [Global assistant](specs/global-assistant.md) — Assistant page, persistent chats, Pi tools over user API, streamed timeline, compare chart.
 - [Assistant analytics tools](specs/assistant-analytics-tools.md) — typed analytics tools, result-backed charts, honest errors, seeded regression set (draft 2026-10-29).
 - [Discovery-first assistant](specs/discovery-first-assistant.md) — live progress, authorized event metadata, clarification UI and repeated evaluations.
