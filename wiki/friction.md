@@ -21,3 +21,11 @@
 - A failed gate after the lane-side commit leaves the worktree committed; retry fails with empty scope until MAIN soft-resets it.
 - New lane deps are not installed in MAIN node_modules before the merged-tree tests: install from the lane lockfile first.
 - Full affected run under machine load ~22 times out child-process tests; use VITEST_MAX_WORKERS=4.
+
+## 2026-10-29 — Route-group Owns blocks disjoint parallel lanes
+
+Wave 20261029-1504: UI Owns src/app/*main*/assistant/** falsely overlaps backend src/app/api/websites/[websiteId]/people/**. Retried explicit UI filenames with literal (main) per peer suggestion; preflight strips parenthesized route group as notes and rejects resulting /assistant/... as absolute paths. No UI lane spawned and backend preserved. Serialize UI after backend rather than bypass ownership gates. Tool should support Next route-group literal segments consistently in overlap and merge parsers.
+
+## 2026-10-29 — Formatting-only rejection severity dispute
+
+analytics-tools-r2 judge0001 reproduced functional acceptance (347 broad +7 PG integration) and both prior fixes, but REJECTed solely pre-existing runtime.ts JSON-expression line wrapping inside owned path. This exact wrap repeatedly reappears from formatting tooling. MAIN did not override or merge REJECT; requested fresh independent judge0002 to reconcile severity against review skill section6 (style low, low never burns rounds), with full reproduction and no source edits.

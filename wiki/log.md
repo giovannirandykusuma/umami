@@ -83,3 +83,23 @@ Image sha256:54b018e35943b80f432cd3779bc3acc5dd293697d5111a7ab6c25b005936bdd8 (s
 ## [2026-10-28] 20261028-2005/direct | Assistant deployed with authorization
 
 Randy explicitly approved deployment. Fresh protected backup: /opt/umami/backups/20261028T150151Z-assistant (183728-byte custom pg_dump, readable pg_restore TOC, configs and prior image ID). Transferred tested config digest 54b018e35943b80f432cd3779bc3acc5dd293697d5111a7ab6c25b005936bdd8; remote OCI manifest ID cad444ee5f86682ada65d1de17320881fecdc2c7acb9781004cf617325108202, identical layers and runtime config. Offline pinned Pi confinement/RPC smoke passed on VPS. Health-gated compose rollout succeeded, zero restarts, migration 27_add_ai_assistant finished. Public heartbeat 200/ok, login page 200, anonymous chats 401; built source SHA 7db2d4921 confirmed in served image assets; memory 165.3 MiB / 1 GiB. No production model prompt or authenticated analytics access during this rollout. Previous compose override retained for app rollback; additive chat tables need not be dropped for app rollback.
+
+## [2026-10-29] 20261029-1504/analytics-tools | Provision worker test environment
+
+Worker blocked before implementation on absent worktree dependencies and synthetic databases. MAIN supplied an ignored node_modules symlink to existing dependencies, prohibited shared installs/mutations, and launched receipt-checked synthetic PG/CH setup plus Prisma schema push only to analytics_integration. Worker steered to continue implementation/unit tests while setup completes; no production or live provider access authorized. Keep dependency link and fixtures for fresh judge.
+
+## [2026-10-29] 20261029-1504/analytics-tools | Resolve runtime allowlist seam
+
+Worker correctly forked on runtime.ts hardcoded original four-tool allowlist. MAIN authorized narrow Owns expansion to runtime.ts and runtime.test.ts: add exactly the five spec analytics tool names, optional display titles, and allow/deny bridging regression tests; preserve unknown-name denial, tool limits, sandbox and session restoration. Worker owns the coupled change to avoid divergent main/worktree edits. Existing main line-wrap drift remains untouched. MAIN launched worktree-local Prisma generation (schema output src/generated/prisma) against synthetic configuration. No deployment or provider spend.
+
+## [2026-10-29] 20261029-1504/analytics-tools | Resolve acceptance runner contention
+
+Worker reports original test selection timing out repeatedly in pre-existing query.test.ts import while same selection passes with two workers (341 passed). MAIN authorized VITEST_MAX_WORKERS=2 for acceptance, preserving test selection/assertions/timeouts. Fresh judge must reproduce; no acceptance override issued. Also expanded Owns to scripts/ai/assistant-tools.test.mjs to update old four-tool registry expectation for nine approved names and run coupled regression coverage. Worker reports seven real PG integration cases passing, CH query-builder coverage only, and three existing TS diagnostics rather than prior four; judge to verify no new changed-file errors.
+
+## [2026-10-29] 20261029-1504/analytics-tools-r2 | Resolve nested dependencies and import budget
+
+R2 worker reports both judge findings fixed with six pre-fix regression cases, seven PG integration cases passing, but blocked on missing worktree packages/mcp/node_modules and unchanged query import exceeding five seconds. MAIN linked the existing nested MCP dependencies without installs or source changes. Approved acceptance CLI --maxWorkers=1 --testTimeout=15000 solely for runner/import contention; implementation deadlines/assertions unchanged, no test/config edit. Fresh judge must reproduce adjusted command and baseline diagnostics. Stop repeated retries if new budget fails and investigate timing.
+
+## [2026-10-29] 20261029-1504/analytics-tools-r2 | Authorized narrow review recovery
+
+Two fresh judges reproduced functional green but rejected unrelated runtime line wrapping under explicit judge scope rule. Randy selected narrow recovery: preserve implementation, fresh worker removes only unrelated hunk and investigates recurring formatter, then fresh review. No deployment/model calls authorized. Two low findings note load-sensitive unchanged query import and runtime cancellation test; run verification serially.
