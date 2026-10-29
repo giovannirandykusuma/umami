@@ -1,11 +1,71 @@
 # Assistant analytics evaluation
 
-## Status
+## Live result — 2026-10-29
 
-**Live acceptance item 5 is DEFERRED. Randy has not approved model spend.**
-Baseline pass rate: **not run**. Candidate pass rate: **not run**. No live results
-are implied by the offline self-test. This lane does not deploy, start engines,
-modify the assistant protocol, or use production data.
+Randy's approved synthetic-only run completed after MAIN's permanent-fix-ready
+message. **Official baseline: 0/6 (0%). Candidate: 6/6 (100%). Delta: +100
+percentage points.** Each of the six baseline cases failed only the official
+`expected exactly one result-chart` requirement: baseline emitted legacy `chart`
+parts. All six candidate cases passed the unchanged evaluator. Supplementary
+text-only `TOTAL:` correctness was **6/6 for both**; this does not replace chart
+parity and does not demonstrate a numerical-answer improvement.
+
+- Baseline source `7db2d49212c258a89c1cc4f10e3d71e1d8b97388`, image
+  `sha256:12fb54b1ecbb0fa551b9a0683fb1d6ddc7f42a436ed8cc5d2b0b2898b3b7d188`.
+  Built with geo enabled and exact source URL. Packaging-only adjustment added
+  `COPY --from=builder --chown=nextjs:nodejs /app/geo ./geo` to the archived
+  baseline Dockerfile. No assistant/scoring code changes.
+- Candidate source `6ae9baad76f36672fd9c122a94ac0c418ae8e4f6`, MAIN-attested image
+  `sha256:081812c5b2cb1d56fe3563f5f38e17d91c0be994459fbed848f0b624d30cd54c`.
+  MAIN explicitly authorized this geo-fixed candidate in place of the original
+  `0f61e56341cb72811468c692a6848de671b71b27` pin. No concurrent chart polish used.
+- Both used nine-router `cx/gpt-6.1-sol`, reasoning `medium`, same isolated
+  persistent PostgreSQL seed/owner, no production credentials or connections.
+  The candidate evaluator was unchanged: SHA256
+  `60b13b682097339ed8450ce89aa2e60c033ce7653b337d6bd707e03fc56a282b`;
+  fixture hash `832581556e85ad40c558e83d5f25b2ea3ed327e8516ece4ffcd960ef9e259eb1`.
+- Both images passed pre-start extracted MaxMind parse/type/public-IP lookup.
+  Both passed synthetic ingest HTTP `[200,200]`, persisted pageview/event/geo
+  `1|1|2` before model calls. Temporary smoke sites were removed before scoring.
+  Seed counts remained `1|2|18|34|27` (synthetic owners/sites/sessions/properties/
+  events); all evaluation chats were deleted. A private DB dump was saved before
+  removing only this runner's containers/network.
+
+Private evidence directory (all files mode 0600):
+`/Users/randy/Developer/work/umami/.shikumi/runs/20261029-1504/live-analytics-eval/scratch/reports-20261029-190318`.
+Includes `baseline.json`, `candidate.json`, `comparison.json`,
+`supplementary-text-totals.json`, `seed-receipt.json`, `seed.sql`, per-app ingest
+and geo checks, configs, runner logs, and `synthetic-db.sql`.
+
+Runnable replay (creates a new dedicated DB; requires explicit spend approval):
+
+```sh
+AI_ANALYTICS_APPROVE_SPEND=Randy-approved-synthetic-only \
+ANALYTICS_REPORT_DIR=/private/new-analytics-report-directory \
+ANALYTICS_MAXMIND_MODULE=/absolute/path/to/node_modules/maxmind \
+ANALYTICS_BASELINE_IMAGE=sha256:12fb54b1ecbb0fa551b9a0683fb1d6ddc7f42a436ed8cc5d2b0b2898b3b7d188 \
+ANALYTICS_CANDIDATE_IMAGE=sha256:081812c5b2cb1d56fe3563f5f38e17d91c0be994459fbed848f0b624d30cd54c \
+node scripts/ai/release-smoke/analytics-live.mjs
+```
+
+The runner reads `~/.pi/agent/9router-config.json` without printing secrets.
+Six cases from one stochastic provider run are **not statistical proof**. No
+production operations, push, deployment or browser-rendering validation occurred.
+The strict improvement gate passed, but this lane has no deploy authorization.
+Offline self-tests and live replay passed; affected-tests could not load this
+worktree's missing `vitest` dependency.
+
+## Operational history
+
+MAIN paused two early builds during the ingest incident. They were canceled
+without model calls; the skipped-geo attempt was discarded. MAIN subsequently
+sent permanent-fix-ready authorization and explicitly approved reuse of the
+geo-fixed immutable candidate listed above. Production access and deployment
+remain forbidden. The successful baseline build used no geo skip flag.
+
+The private gateway configuration has endpoint/key but no model override. Keep
+credentials out of logs. Store reports mode 0600 outside the tracked repository.
+If candidate <= baseline, STOP and report; never change scoring to improve rates.
 
 `node scripts/ai/eval-analytics.mjs` defaults to a local JSON plan: six cases,
 expected series, a stable SHA-256 fixture/prompt fingerprint, and null live rates.
@@ -85,7 +145,7 @@ The script additionally requires `syntheticOnly: true`, a matching fixture hash,
 loopback HTTP origin with an explicit port, and both website domains exactly
 `synthetic.invalid`. Those checks are safeguards, not database ownership proof.
 
-1. Obtain separate model-spend approval. Do not set the approval variable now.
+1. Obtain explicit model-spend approval for any new replay before setting opt-in.
 2. Follow `docs/ai-discovery-integration.md` for receipt-checked synthetic engines
    (analytics uses schema `analytics_integration`, not `discovery_integration`).
    Never stop shared engines or substitute a production connection.
@@ -134,7 +194,8 @@ per-case results, rates, revision/model/seed receipt and fixture hash. Output fi
 are private (0600) and refuse overwrite. Do not commit reports or credentials.
 Comparison regrades saved transcripts and refuses different model settings,
 fixture hashes or seed receipts. MAIN records real baseline/candidate rates and
-revisions in `wiki/log.md` only after approved runs. Until then both are **not run**.
+revisions in `wiki/log.md` only after approved runs. The completed run above is
+one such approved replay; the evaluator's default plan still prints not-run rates.
 
-The live orchestration has not been exercised here. Offline validation does not
-prove live model behavior, deployed isolation, engine parity or UI rendering.
+Offline validation alone does not prove live behavior. The recorded live replay
+proves these six synthetic cases, not production behavior or UI rendering.
