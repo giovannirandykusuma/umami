@@ -10,6 +10,7 @@ import {
   canViewBoardEntities,
   hasValidBoardReports,
 } from '@/permissions';
+import { getInvalidBoardAnalysis } from '@/permissions/board';
 import { createBoard, getUserBoards } from '@/queries/prisma';
 
 export async function GET(request: Request) {
@@ -69,6 +70,16 @@ export async function POST(request: Request) {
 
   if (!(await hasValidBoardReports(body.type, body.parameters))) {
     return badRequest({ message: 'Board contains invalid saved reports.' });
+  }
+
+  const analysisError = await getInvalidBoardAnalysis(
+    auth,
+    { userId: teamId ? null : auth.user.id, teamId: teamId ?? null },
+    body.parameters,
+  );
+
+  if (analysisError) {
+    return badRequest({ message: analysisError });
   }
 
   const data = {

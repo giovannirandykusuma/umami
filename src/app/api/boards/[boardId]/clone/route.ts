@@ -13,6 +13,7 @@ import {
   hasValidBoardReports,
   stripInvalidBoardReports,
 } from '@/permissions';
+import { getInvalidBoardAnalysis } from '@/permissions/board';
 import { createBoard, getBoard } from '@/queries/prisma';
 
 export async function POST(request: Request, { params }: { params: Promise<{ boardId: string }> }) {
@@ -63,6 +64,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ boa
 
   if (!(await hasValidBoardReports(sourceType, sanitizedParameters))) {
     return badRequest({ message: 'Board contains invalid saved reports.' });
+  }
+
+  const analysisError = await getInvalidBoardAnalysis(
+    auth,
+    { userId: sourceBoard.teamId ? null : (sourceBoard.userId ?? auth.user.id), teamId: sourceBoard.teamId },
+    sanitizedParameters,
+  );
+
+  if (analysisError) {
+    return badRequest({ message: analysisError });
   }
 
   const result = await createBoard({

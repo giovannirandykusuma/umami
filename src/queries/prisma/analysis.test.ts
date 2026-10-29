@@ -1,0 +1,124 @@
+import { beforeEach, expect, test, vi } from 'vitest';
+import { normalizeDefinition } from '@/lib/analyst/definition';
+
+// In-memory stand-in for the three tables, with the same unique constraints.
+const db = vi.hoisted(() => {
+  const state = { analyses: [] as any[], revisions: [] as any[], operations: [] as any[] };
+  const unique = (rows: any[], row: any, keys: string[]) => {
+    if (rows.some(r => keys.every(k => r[k] === row[k])))
+      throw Object.assign(new Error('unique'), { code: 'P2002' });
+  };
+  const tx = {
+    savedAnalysis: {
+      create: async ({ data }: any) => (state.analyses.push({ ...data }), { ...data }),
+      findUnique: async ({ where }: any) => state.analyses.find(a => a.id === where.id) ?? null,
+      findUniqueOrThrow: async ({ where }: any) => ({
+        ...state.analyses.find(a => a.id === where.id),
+      }),
+      updateMany: async ({ where, data }: any) => {
+        const row = state.analyses.find(a => a.id === where.id && a.revision === where.revision);
+        if (!row) return { count: 0 };
+        Object.assign(row, data);
+        return { count: 1 };
+      },
+    },
+    savedAnalysisRevision: {
+      create: async ({ data }: any) => {
+        unique(state.revisions, data, ['analysisId', 'revision']);
+        state.revisions.push({ ...data });
+      },
+    },
+    analysisOperation: {
+      findUnique: async ({ where }: any) => {
+        const w = where.userId_taskScope_key;
+        return (
+          state.operations.find(
+            o => o.userId === w.userId && o.taskScope === w.taskScope && o.key === w.key,
+          ) ?? null
+        );
+      },
+      create: async ({ data }: any) => {
+        unique(state.operations, data, ['userId', 'taskScope', 'key']);
+        state.operations.push({ ...data });
+      },
+    },
+  };
+  const client = {
+    ...tx,
+    // Rollback on throw: snapshot and restore, like a real transaction.
+    $transaction: async (fn: any) => {
+      const snapshot = JSON.stringify(state);
+      try {
+        return await fn(tx);
+      } catch (e) {
+        Object.assign(state, JSON.parse(snapshot));
+        throw e;
+      }
+    },
+  };
+  return { state, client };
+});
+vi.mock('@/lib/prisma', () => ({ default: { client: db.client } }));
+
+const { createAnalysis, updateAnalysis } = await import('./analysis');
+const definition = normalizeDefinition({
+  schemaVersion: 1,
+  source: { websiteId: '11111111-1111-4111-8111-111111111111' },
+  operation: 'totals',
+  metric: 'pageviews',
+  datePolicy: { type: 'rolling', window: '7d' },
+  timezone: 'UTC',
+  semanticBinding: {
+    label: 'Pageviews',
+    unit: 'pageviews',
+    population: 'all',
+    meaningSource: 'observed_only',
+  },
+});
+const create = (key = 'k1', name = 'A') =>
+  createAnalysis({ userId: 'u1', operationKey: key, name, status: 'draft', definition });
+
+beforeEach(() => {
+  db.state.analyses = [];
+  db.state.revisions = [];
+  db.state.operations = [];
+});
+
+test('same key and request replays; different payload under same key conflicts', async () => {
+  const first = await create();
+  const again = await create();
+  expect(again).toEqual({ result: first.result, replayed: true });
+  await expect(create('k1', 'B')).rejects.toMatchObject({ code: 'conflict' });
+  expect(db.state.analyses).toHaveLength(1);
+  // Keys are scoped per principal/task: another task may reuse the key.
+  await createAnalysis({
+    userId: 'u1',
+    taskId: 't2',
+    operationKey: 'k1',
+    name: 'B',
+    status: 'draft',
+    definition,
+  });
+  expect(db.state.analyses).toHaveLength(2);
+});
+
+test('revisions are append-only and stale expectedRevision conflicts without mutation', async () => {
+  const { result } = await create();
+  const id = (result as any).id;
+  const updated = await updateAnalysis(id, {
+    userId: 'u1',
+    operationKey: 'u1',
+    expectedRevision: 1,
+    name: 'Renamed',
+  });
+  expect(updated.result).toMatchObject({ revision: 2, name: 'Renamed' });
+  await expect(
+    updateAnalysis(id, { userId: 'u1', operationKey: 'u2', expectedRevision: 1, name: 'Stale' }),
+  ).rejects.toMatchObject({ code: 'conflict', field: 'expectedRevision' });
+  expect(db.state.revisions.map(r => [r.revision, r.name])).toEqual([
+    [1, 'A'],
+    [2, 'Renamed'],
+  ]);
+  // Failed operation left no idempotency record: retry with a fresh revision may proceed.
+  expect(db.state.operations.map(o => o.key)).toEqual(['k1', 'u1']);
+});

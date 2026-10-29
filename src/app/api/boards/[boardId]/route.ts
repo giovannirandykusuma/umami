@@ -10,7 +10,9 @@ import {
   canViewBoardEntities,
   hasValidBoardReports,
 } from '@/permissions';
+import { getInvalidBoardAnalysis } from '@/permissions/board';
 import { deleteBoard, getBoard, updateBoard } from '@/queries/prisma';
+import { updateBoardAtRevision } from '@/queries/prisma/board';
 
 export async function GET(request: Request, { params }: { params: Promise<{ boardId: string }> }) {
   const { auth, error } = await parseRequest(request);
@@ -45,6 +47,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ boa
     name: z.string().max(200).optional(),
     description: z.string().max(500).optional(),
     parameters: z.object({}).passthrough().optional(),
+    // Optional for legacy clients; lifecycle callers send it for compare-and-set.
+    expectedRevision: z.number().int().positive().optional(),
   });
 
   const { auth, body, error } = await parseRequest(request, schema);
@@ -78,10 +82,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ boa
     if (!(await hasValidBoardReports(nextType, nextParameters))) {
       return badRequest({ message: 'Board contains invalid saved reports.' });
     }
+
+    const analysisError = await getInvalidBoardAnalysis(auth, currentBoard, nextParameters);
+
+    if (analysisError) {
+      return badRequest({ message: analysisError });
+    }
   }
 
   try {
-    const board = await updateBoard(boardId, { type, name, description, parameters });
+    const data = { type, name, description, parameters };
+
+    if (body.expectedRevision !== undefined) {
+      const board = await updateBoardAtRevision(boardId, body.expectedRevision, data);
+
+      if (!board) {
+        return Response.json(
+          { error: { message: 'Board revision changed.', code: 'conflict', status: 409 } },
+          { status: 409 },
+        );
+      }
+
+      return Response.json(board);
+    }
+
+    const board = await updateBoard(boardId, data);
 
     return Response.json(board);
   } catch (e: any) {

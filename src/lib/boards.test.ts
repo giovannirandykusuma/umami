@@ -146,3 +146,26 @@ test('metrics table limits pixel and link boards to overview-page metric types',
     'device',
   ]);
 });
+
+test('AnalysisWidget carries no entity ids, so board entity checks never trust its props', () => {
+  const board = {
+    type: 'mixed',
+    parameters: {
+      rows: [
+        {
+          id: 'row',
+          columns: [
+            {
+              id: 'column',
+              component: {
+                type: 'AnalysisWidget',
+                props: { analysisId: 'a', visualization: 'table', websiteIds: ['smuggled'] },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  };
+  expect(getBoardEntityIds(board)).toEqual({ websiteIds: [], pixelIds: [], linkIds: [] });
+});

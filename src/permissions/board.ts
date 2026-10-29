@@ -2,7 +2,10 @@ import { hasPermission } from '@/lib/auth';
 import { BOARD_ENTITY_TYPES, getBoardEntityIds, getResolvedComponentEntity } from '@/lib/boards';
 import { PERMISSIONS } from '@/lib/constants';
 import type { Auth, BoardComponentConfig, BoardParameters } from '@/lib/types';
+import { isRendererCompatible } from '@/lib/analyst/definition';
 import { getBoard, getReport, getTeamUser } from '@/queries/prisma';
+import { getAnalysis } from '@/queries/prisma/analysis';
+import { canViewAnalysis, isAnalysisVisibleOnBoard } from './analysis';
 import { canViewLink } from './link';
 import { canViewPixel } from './pixel';
 import { canViewWebsite } from './website';
@@ -237,4 +240,45 @@ export async function canDeleteBoard({ user }: Auth, boardId: string) {
   }
 
   return false;
+}
+
+export const ANALYSIS_WIDGET = 'AnalysisWidget';
+
+/** Every AnalysisWidget component in board order. */
+export function getAnalysisWidgets(parameters: BoardParameters = {}) {
+  return (parameters.rows ?? []).flatMap(row =>
+    (row.columns ?? [])
+      .map(column => column.component)
+      .filter(component => component?.type === ANALYSIS_WIDGET),
+  );
+}
+
+/**
+ * Validates AnalysisWidget references for a board owned by `owner`: strict config, viewer access,
+ * no exposure of a more restricted analysis, and renderer compatibility. Null when valid.
+ */
+export async function getInvalidBoardAnalysis(
+  auth: Auth,
+  owner: { userId: string | null; teamId: string | null },
+  parameters: BoardParameters = {},
+): Promise<string | null> {
+  for (const component of getAnalysisWidgets(parameters)) {
+    const props = component.props ?? {};
+    const allowed = ['analysisId', 'title', 'visualization'];
+    if (Object.keys(props).some(key => !allowed.includes(key))) return 'Invalid analysis widget.';
+    if (typeof props.analysisId !== 'string') return 'Invalid analysis widget.';
+    if (props.title !== undefined && (typeof props.title !== 'string' || props.title.length > 200))
+      return 'Invalid analysis widget.';
+    const analysis = await getAnalysis(props.analysisId);
+    if (!analysis || !(await canViewAnalysis(auth, analysis))) return 'Analysis is not accessible.';
+    if (!isAnalysisVisibleOnBoard(owner, analysis))
+      return 'Analysis visibility is narrower than the board.';
+    // Current source authority, not only access to the saved record (revocation denies save).
+    const websiteId = (analysis.definition as any)?.source?.websiteId;
+    if (typeof websiteId !== 'string' || !(await canViewWebsite(auth, websiteId)))
+      return 'Analysis source is not accessible.';
+    if (!isRendererCompatible((analysis.definition as any)?.operation, String(props.visualization)))
+      return 'Visualization is incompatible with the analysis.';
+  }
+  return null;
 }

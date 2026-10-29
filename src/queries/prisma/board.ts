@@ -67,7 +67,20 @@ export async function createBoard(data: Prisma.BoardUncheckedCreateInput) {
 }
 
 export async function updateBoard(boardId: string, data: any) {
-  return prisma.client.board.update({ where: { id: boardId }, data });
+  // Every write advances the optimistic revision, including legacy explicit-Save clients.
+  return prisma.client.board.update({
+    where: { id: boardId },
+    data: { ...data, revision: { increment: 1 } },
+  });
+}
+
+/** Compare-and-set update; null when the stored revision no longer matches. */
+export async function updateBoardAtRevision(boardId: string, expectedRevision: number, data: any) {
+  const { count } = await prisma.client.board.updateMany({
+    where: { id: boardId, revision: expectedRevision },
+    data: { ...data, revision: { increment: 1 } },
+  });
+  return count === 1 ? getBoard(boardId) : null;
 }
 
 export async function deleteBoard(boardId: string) {

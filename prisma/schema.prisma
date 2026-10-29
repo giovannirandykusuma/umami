@@ -415,6 +415,8 @@ model Board {
   parameters  Json
   userId      String?   @map("user_id") @db.Uuid
   teamId      String?   @map("team_id") @db.Uuid
+  // Optimistic revision for lifecycle mutations; legacy writers still increment it.
+  revision    Int       @default(1)
   createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -425,6 +427,81 @@ model Board {
   @@index([teamId])
   @@index([createdAt])
   @@map("board")
+}
+
+/// Reusable analyst definition. The current row mirrors the latest immutable revision.
+model SavedAnalysis {
+  id              String    @id() @map("analysis_id") @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  teamId          String?   @map("team_id") @db.Uuid
+  name            String    @db.VarChar(200)
+  description     String?   @db.VarChar(500)
+  schemaVersion   Int       @map("schema_version")
+  revision        Int
+  status          String    @db.VarChar(20)
+  definition      Json
+  definitionHash  String    @map("definition_hash") @db.VarChar(64)
+  createdByTaskId String?   @map("created_by_task_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  revisions SavedAnalysisRevision[]
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([createdAt])
+  @@map("saved_analysis")
+}
+
+/// Append-only history: rows are inserted, never updated or deleted by the application.
+model SavedAnalysisRevision {
+  id             String   @id() @map("analysis_revision_id") @db.Uuid
+  analysisId     String   @map("analysis_id") @db.Uuid
+  revision       Int
+  name           String   @db.VarChar(200)
+  description    String?  @db.VarChar(500)
+  status         String   @db.VarChar(20)
+  schemaVersion  Int      @map("schema_version")
+  definition     Json
+  definitionHash String   @map("definition_hash") @db.VarChar(64)
+  userId         String   @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  analysis SavedAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId, revision])
+  @@map("saved_analysis_revision")
+}
+
+/// Idempotency record scoped to principal and task ('' when no task).
+model AnalysisOperation {
+  id          String   @id() @map("analysis_operation_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  taskScope   String   @map("task_scope") @db.VarChar(64)
+  key         String   @db.VarChar(200)
+  requestHash String   @map("request_hash") @db.VarChar(64)
+  result      Json
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([userId, taskScope, key])
+  @@map("analysis_operation")
+}
+
+/// Trusted, single-use confirmation for editing an existing board through a bundle commit.
+/// Bound to principal, task, target board, expected revision and the exact diff hash.
+model AnalysisConfirmation {
+  id               String    @id() @map("analysis_confirmation_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  taskScope        String    @map("task_scope") @db.VarChar(64)
+  boardId          String    @map("board_id") @db.Uuid
+  expectedRevision Int       @map("expected_revision")
+  diffHash         String    @map("diff_hash") @db.VarChar(64)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt           DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, taskScope])
+  @@map("analysis_confirmation")
 }
 
 model Share {
