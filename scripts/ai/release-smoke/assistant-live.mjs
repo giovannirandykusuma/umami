@@ -16,7 +16,33 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveGateway } from '../gateway-config.mjs';
+import { pathToFileURL } from 'node:url';
 
+// The IP in the payload bypasses provider location headers, exercising the mmdb.
+export async function ingestGate({ origin, website, sql, request = fetch }) {
+  const marker = `release-ingest-${randomUUID()}`;
+  const url = `/${marker}`;
+  const statuses = [];
+  for (const name of [undefined, marker]) {
+    const response = await request(`${origin}/api/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'event', payload: {
+        website, hostname: 'ingest.invalid', url, name, ip: '8.8.8.8',
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36',
+      } }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    statuses.push(response.status);
+    assert.equal(response.status, 200, 'synthetic ingestion must return HTTP 200');
+  }
+  const rows = await sql(`SELECT count(*) FILTER (WHERE e.event_type=1), count(*) FILTER (WHERE e.event_type=2 AND e.event_name='${marker}'), count(*) FILTER (WHERE s.country IS NOT NULL) FROM website_event e JOIN session s ON s.session_id=e.session_id WHERE e.website_id='${website}' AND e.url_path='${url}';`);
+  assert.equal(String(rows).trim(), '1|1|2', 'pageview, named event and geo session must persist');
+  return { statuses, persistedPageviews: 1, persistedEvents: 1, geolocatedRows: 2 };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+const ingestOnly = process.env.RELEASE_SMOKE_INGEST_ONLY === '1';
 const image = process.env.RELEASE_SMOKE_IMAGE;
 assert.match(image || '', /^sha256:[0-9a-f]{64}$/, 'RELEASE_SMOKE_IMAGE=sha256:<id> required');
 const prefix = `assistant-smoke-${randomBytes(4).toString('hex')}`;
@@ -93,7 +119,7 @@ async function turn(origin, auth, chatId, message, onPart) {
 }
 
 try {
-  const gateway = resolveGateway(process.env);
+  const gateway = ingestOnly ? {} : resolveGateway(process.env);
   docker(['network', 'create', network]);
   docker([
     'run',
@@ -122,7 +148,7 @@ try {
   const env = {
     DATABASE_URL: 'postgresql://synthetic:synthetic-only@synthetic-db:5432/synthetic',
     APP_SECRET: secret,
-    AI_ENABLED: 'true',
+    AI_ENABLED: ingestOnly ? 'false' : 'true',
     AI_PI_ROOT: '/opt/umami-ai/node_modules/@earendil-works/pi-coding-agent',
     DISABLE_TELEMETRY: '1',
     ...gateway,
@@ -183,6 +209,12 @@ try {
       .join('') +
       `INSERT INTO board (board_id,type,name,description,parameters,user_id) VALUES ('${victimBoard}','mixed','Delete me','synthetic','{"rows":[]}','${user}');`,
   );
+  // Mandatory before seeded traffic or any paid model turns. Never seed these rows.
+  evidence.ingestion = await ingestGate({ origin, website: sites[0].id, sql });
+  if (ingestOnly) {
+    evidence.status = 'passed';
+    console.log(JSON.stringify(evidence, null, 2));
+  } else {
   const rows = [];
   sites.forEach((s, si) => {
     for (let d = 0; d < 14; d++)
@@ -288,6 +320,7 @@ try {
   evidence.status = ok ? 'passed' : 'failed';
   console.log(JSON.stringify(evidence, null, 2));
   process.exitCode = ok ? 0 : 1;
+  }
 } catch (error) {
   evidence.status = 'error';
   evidence.error = String(error?.message || error).slice(0, 500);
@@ -299,4 +332,5 @@ try {
   if (process.env.KEEP !== '1')
     spawnSync('docker', ['network', 'rm', network], { stdio: 'ignore' });
   rmSync(temp, { recursive: true, force: true });
+}
 }

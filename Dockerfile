@@ -49,10 +49,8 @@ ENV BASE_PATH=$BASE_PATH
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/dummy"
 
-ARG SKIP_BUILD_GEO
-ENV SKIP_BUILD_GEO=$SKIP_BUILD_GEO
-
-RUN pnpm build:docker
+# Geo is a required release asset, not an optional build optimization.
+RUN pnpm build:docker && node scripts/build-geo.js --check
 
 # Production image, copy all the files and run next
 FROM node:${NODE_IMAGE_VERSION} AS runner
@@ -102,6 +100,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/generated ./generated
+# getLocation resolves this path from the runtime working directory (/app).
+COPY --from=builder --chown=nextjs:nodejs /app/geo ./geo
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing

@@ -2,112 +2,68 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import https from 'https';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { createGunzip } from 'node:zlib';
 import { list } from 'tar';
-import zlib from 'zlib';
-
-if (process.env.SKIP_BUILD_GEO) {
-  console.log('SKIP_BUILD_GEO is set. Skipping geo setup.');
-  process.exit(0);
-}
-
-if (process.env.VERCEL && !process.env.BUILD_GEO) {
-  console.log('Vercel environment detected. Skipping geo setup.');
-  process.exit(0);
-}
+import maxmind from 'maxmind';
 
 const db = 'GeoLite2-City';
+const filename = path.resolve(process.cwd(), 'geo', `${db}.mmdb`);
 
-// Support custom URL via environment variable
-let url = process.env.GEO_DATABASE_URL;
+async function validate(file) {
+  const reader = await maxmind.open(file);
+  if (reader.metadata.databaseType !== db) throw new Error('Expected GeoLite2-City database');
+  if (!reader.get('8.8.8.8')?.country?.iso_code) throw new Error('Geo database lookup failed');
+  console.log('Validated GeoLite2-City database');
+}
 
-// Fallback to default URLs if not provided
-if (!url) {
-  if (process.env.MAXMIND_LICENSE_KEY) {
-    url =
-      `https://download.maxmind.com/app/geoip_download` +
-      `?edition_id=${db}&license_key=${process.env.MAXMIND_LICENSE_KEY}&suffix=tar.gz`;
+try {
+  // Offline preflight; also used after the Docker build, regardless of skip settings.
+  if (process.argv[2] === '--check') {
+    await validate(process.argv[3] || filename);
+  } else if (
+    process.env.SKIP_BUILD_GEO ||
+    (process.env.VERCEL && !process.env.BUILD_GEO)
+  ) {
+    // A download may be skipped, never the required asset validation.
+    await validate(filename);
   } else {
-    url = `https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/${db}.tar.gz`;
-  }
-}
-
-const dest = path.resolve(process.cwd(), 'geo');
-
-if (!fs.existsSync(dest)) {
-  fs.mkdirSync(dest);
-}
-
-// Check if URL points to a direct .mmdb file (already extracted)
-const isDirectMmdb = url.endsWith('.mmdb');
-
-// Download handler for compressed tar.gz files
-const downloadCompressed = url =>
-  new Promise(resolve => {
-    https.get(url, res => {
-      resolve(res.pipe(zlib.createGunzip({})).pipe(list()));
-    });
-  });
-
-// Download handler for direct .mmdb files
-const downloadDirect = (url, originalUrl) =>
-  new Promise((resolve, reject) => {
-    https.get(url, res => {
-      // Follow redirects
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        downloadDirect(res.headers.location, originalUrl || url)
-          .then(resolve)
-          .catch(reject);
-        return;
+    const url = process.env.GEO_DATABASE_URL || (process.env.MAXMIND_LICENSE_KEY
+      ? `https://download.maxmind.com/app/geoip_download?edition_id=${db}&license_key=${process.env.MAXMIND_LICENSE_KEY}&suffix=tar.gz`
+      : `https://raw.githubusercontent.com/GitSquared/node-geolite2-redist/master/redist/${db}.tar.gz`);
+    fs.mkdirSync(path.dirname(filename), { recursive: true });
+    const temporary = `${filename}.download`;
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+      if (!response.ok) throw new Error(`Geo download HTTP ${response.status}`);
+      if (new URL(url).pathname.endsWith('.mmdb')) {
+        await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(temporary));
+      } else {
+        const writes = [];
+        let found = false;
+        await pipeline(Readable.fromWeb(response.body), createGunzip(), list({
+          onReadEntry(entry) {
+            if (path.basename(entry.path) === `${db}.mmdb` && !found) {
+              found = true;
+              const write = pipeline(entry, fs.createWriteStream(temporary));
+              // Attach immediately so a disk error cannot become an unhandled rejection.
+              write.catch(() => {});
+              writes.push(write);
+            } else entry.resume();
+          },
+        }));
+        await Promise.all(writes);
+        if (!found) throw new Error('Geo archive missing GeoLite2-City.mmdb');
       }
-
-      const filename = path.join(dest, path.basename(originalUrl || url));
-      const fileStream = fs.createWriteStream(filename);
-
-      res.pipe(fileStream);
-
-      fileStream.on('finish', () => {
-        fileStream.close();
-        console.log('Saved geo database:', filename);
-        resolve();
-      });
-
-      fileStream.on('error', e => {
-        reject(e);
-      });
-    });
-  });
-
-// Execute download based on file type
-if (isDirectMmdb) {
-  downloadDirect(url).catch(e => {
-    console.error('Failed to download geo database:', e);
-    process.exit(1);
-  });
-} else {
-  downloadCompressed(url)
-    .then(
-      res =>
-        new Promise((resolve, reject) => {
-          res.on('entry', entry => {
-            if (entry.path.endsWith('.mmdb')) {
-              const filename = path.join(dest, path.basename(entry.path));
-              entry.pipe(fs.createWriteStream(filename));
-
-              console.log('Saved geo database:', filename);
-            }
-          });
-
-          res.on('error', e => {
-            reject(e);
-          });
-          res.on('finish', () => {
-            resolve();
-          });
-        }),
-    )
-    .catch(e => {
-      console.error('Failed to download geo database:', e);
-      process.exit(1);
-    });
+      await validate(temporary);
+      fs.renameSync(temporary, filename);
+    } finally {
+      fs.rmSync(temporary, { force: true });
+    }
+  }
+} catch {
+  // Never print download URLs: they may contain a license key.
+  console.error('Required GeoLite2-City database missing, invalid, or download failed');
+  process.exitCode = 1;
 }
