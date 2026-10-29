@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, useTheme } from '@umami/react-zen';
+import { formatInTimeZone } from 'date-fns-tz';
 import { useState } from 'react';
 import { Chart } from '@/components/charts/Chart';
 import type { AssistantPart } from '@/lib/ai/assistant/protocol';
@@ -18,8 +19,11 @@ export function ResultChart({ part }: { part: Extract<AssistantPart, { type: 're
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(value);
-  // Bucket strings already carry the host's timezone convention; do not reinterpret them.
-  const labels = series.buckets.map(bucket => bucket.t);
+  const labelFormat =
+    series.unit === 'month' ? 'MMM yyyy' : series.unit === 'hour' ? 'dd MMM HH:mm' : 'dd MMM';
+  const labels = series.buckets.map(bucket =>
+    formatInTimeZone(bucket.t, series.timezone, labelFormat),
+  );
   return (
     <section className={styles.chart} aria-label={part.title || series.label}>
       <h3>{part.title || series.label}</h3>
@@ -90,8 +94,7 @@ export function ResultChart({ part }: { part: Extract<AssistantPart, { type: 're
                 {
                   label: series.label,
                   data: series.buckets.map(bucket => bucket.y),
-                  borderColor: colors.chart.text,
-                  backgroundColor: colors.chart.text,
+                  ...colors.chart.views,
                   borderWidth: 2,
                   pointRadius: 2,
                 },
