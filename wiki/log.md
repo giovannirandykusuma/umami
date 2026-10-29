@@ -115,3 +115,7 @@ UI worker passes18 unit tests and baseline-only TS checks but browser fixture500
 ## [2026-10-29] 20261029-1504/analytics-eval | Correct standalone-script acceptance gate
 
 Fresh judges0001/0002 found no source defects and reproduced offline evaluator checks; affected-tests first lacked dependencies then delegated to Vitest --changed, which selected zero tests for standalone .mjs plus docs and exited1. MAIN corrects applicability: generic Vitest gate is N/A for this two-file lane, not a failing implementation test. Required gates remain node syntax, evaluator self-test (nine mutation controls), offline transcript/parity/malformed/opt-in/comparison probes, diff check, scope review. Fresh judge required; no override of existing REJECT, no live model spend.
+
+## [2026-10-29] 20261029-1504/analytics-eval | Offline evaluator merged
+
+Merged e7e0079ae after fresh judge0003 ACCEPT, no findings. Scope/review-content binding and canonical commit-before-squash sequence retained; local merge helper substituted reviewed standalone syntax+self-test+diff-check gate for inapplicable Vitest selector (zero tests for mjs/docs). Gate passed, including9 negative controls. Six-prompt fixture/report/opt-in guard and offline parity/comparison checks independently reproduced by judge. Live baseline/candidate rates NOT RUN, spend unauthorized. Closed evaluator workspace, preserved branch. UI browser verification remains pending.
