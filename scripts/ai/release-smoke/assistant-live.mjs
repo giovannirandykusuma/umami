@@ -20,7 +20,8 @@ import { pathToFileURL } from 'node:url';
 
 // The IP in the payload bypasses provider location headers, exercising the mmdb.
 export async function ingestGate({ origin, website, sql, request = fetch }) {
-  const marker = `release-ingest-${randomUUID()}`;
+  // Event names persist at 50 characters; omit UUID separators, not uniqueness bits.
+  const marker = `release-ingest-${randomUUID().replaceAll('-', '')}`;
   const url = `/${marker}`;
   const statuses = [];
   for (const name of [undefined, marker]) {

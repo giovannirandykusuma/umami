@@ -79,13 +79,25 @@ test('gate sends pageview and named event with public IP then verifies persisted
   assert.ok(f.query.includes(`e.website_id='${website}'`));
   assert.ok(f.query.includes(f.sent[0].payload.url));
 });
+test('gate marker fits the persisted event name without losing UUID uniqueness', async () => {
+  const f = fixture();
+  await ingestGate(f.args);
+  const marker = f.sent[1].payload.name;
+  const constants = readFileSync('src/lib/constants.ts', 'utf8');
+  const limit = Number(constants.match(/eventName: (\d+)/)[1]);
+  assert.ok(marker.length <= limit, `marker length ${marker.length} exceeds eventName ${limit}`);
+  assert.match(marker, /^release-ingest-[0-9a-f]{32}$/);
+  assert.equal(f.sent[0].payload.url, `/${marker}`);
+  assert.equal(f.sent[1].payload.url, `/${marker}`);
+  assert.ok(f.query.includes(`e.event_name='${marker}'`));
+});
 test('HTTP failure fails gate before DB check', async () => {
   const f = fixture(500);
   await assert.rejects(ingestGate(f.args), /HTTP 200/);
   assert.equal(f.query, undefined);
 });
 test('HTTP 200 alone is insufficient: missing pageview, event or geo fails', async () => {
-  for (const rows of ['0|1|1', '1|0|1', '1|1|0', '0|0|0']) {
+  for (const rows of ['0|1|1', '1|0|1', '1|0|2', '1|1|0', '0|0|0']) {
     await assert.rejects(ingestGate(fixture(200, rows).args), /must persist/);
   }
 });
