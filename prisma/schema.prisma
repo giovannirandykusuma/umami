@@ -34,6 +34,7 @@ model User {
   twoFactorRateLimit   TwoFactorRateLimit?
   apiKeys              ApiKey[]
   aiChats              AiChat[]
+  analystTasks         AnalystTask[]
 
   @@map("user")
 }
@@ -48,9 +49,37 @@ model AiChat {
 
   user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages AiChatMessage[]
+  analystTasks AnalystTask[]
 
   @@index([userId, updatedAt])
   @@map("ai_chat")
+}
+
+model AnalystTask {
+  id                 String    @id @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  chatId             String    @map("chat_id") @db.Uuid
+  goal               String    @db.VarChar(2000)
+  status             String    @db.VarChar(20)
+  budgets            Json
+  pausedAt           DateTime? @map("paused_at") @db.Timestamptz(6)
+  pausedMs           Int       @default(0) @map("paused_ms")
+  deadlineAt         DateTime  @map("deadline_at") @db.Timestamptz(6)
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(6)
+  context            Json
+  draftIds           Json      @map("draft_ids")
+  operationKeys      Json      @map("operation_keys")
+  definitionVersions Json      @map("definition_versions")
+  receipts           Json
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  chat AiChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, chatId])
+  @@index([expiresAt])
+  @@map("analyst_task")
 }
 
 model AiChatMessage {
