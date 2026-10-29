@@ -221,7 +221,17 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
               ++tools > 40 ||
               typeof value.toolCallId !== 'string' ||
               toolParts.has(value.toolCallId) ||
-              !['umami_api', 'ask_user', 'show_chart', 'open_link'].includes(value.toolName)
+              ![
+                'umami_api',
+                'ask_user',
+                'show_chart',
+                'open_link',
+                'analytics_schema',
+                'find_people',
+                'query_series',
+                'query_breakdown',
+                'query_totals',
+              ].includes(value.toolName)
             )
               throw new Error('Assistant tool limit or name denied');
             const part: Extract<AssistantPart, { type: 'tool' }> = {
@@ -270,6 +280,20 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
               throw new Error('Invalid host tool request');
             seen.add(value.id);
             const request = JSON.parse(value.placeholder);
+            if (
+              ![
+                'umami_api',
+                'ask_user',
+                'show_chart',
+                'open_link',
+                'analytics_schema',
+                'find_people',
+                'query_series',
+                'query_breakdown',
+                'query_totals',
+              ].includes(request.name)
+            )
+              throw new Error('Invalid host tool name');
             pending.add(value.id);
             Promise.resolve()
               .then(() => input.tool(request.name, request.args))

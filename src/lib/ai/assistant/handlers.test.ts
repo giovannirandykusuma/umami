@@ -18,6 +18,7 @@ vi.mock('./store', () => ({
   summary: (chat: any) => ({ id: chat.id, title: chat.title }),
 }));
 vi.mock('./runtime', () => ({ runAssistant: mocks.run }));
+import { getSeries } from './analytics/results';
 import {
   cancel,
   createChat,
@@ -97,6 +98,38 @@ it('persists user before streaming, titles the first turn and persists terminal 
     parts: [{ type: 'text', text: 'Hello' }],
   });
   expect(mocks.store.append.mock.calls[1][3]).toBe('session');
+});
+it('passes trusted handler scope, advances it, and clears results on deletion', async () => {
+  let resultId: string;
+  let trusted: any;
+  mocks.run.mockImplementation(async input => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('[{"t":"2026-01-01T00:00:00Z","y":2}]')),
+    );
+    const result = await input.tool('query_series', {
+      websiteId: '11111111-1111-4111-8111-111111111111',
+      startAt: Date.parse('2026-01-01T00:00:00Z'),
+      endAt: Date.parse('2026-01-01T23:59:59Z'),
+      metric: 'events',
+      unit: 'day',
+      timezone: 'UTC',
+      userId: 'forged',
+      chatId: 'forged',
+    });
+    expect(result).toMatchObject({ ok: true });
+    resultId = result.data.resultId;
+    vi.unstubAllGlobals();
+    return {};
+  });
+  // Observe the actual seam without replacing executeTool: a scoped result can be saved only for the handler-created generation.
+  await (await runTurn(request(), context())).text();
+  const { advanceTurn } = await import('./analytics/results');
+  trusted = advanceTurn('user', id);
+  expect(getSeries(trusted, resultId!)).toMatchObject({ total: 2 });
+  expect(getSeries({ ...trusted, userId: 'forged', chatId: 'forged' }, resultId!)).toBeUndefined();
+  await deleteChat(request(), context());
+  expect(getSeries(trusted, resultId)).toBeUndefined();
 });
 it('enforces one per chat, four process-wide, and cancellation persistence', async () => {
   mocks.store.get.mockImplementation(async (_user, chatId) => ({

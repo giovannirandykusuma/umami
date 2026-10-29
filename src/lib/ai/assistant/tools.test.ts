@@ -30,7 +30,11 @@ describe('assistant host tools', () => {
     );
     expect(fetch).not.toHaveBeenCalled();
     expect(interaction.reply({ kind: 'confirm', partId: events[0].id, confirmed })).toBe(true);
-    expect(await result).toContain(confirmed ? '200' : 'User denied');
+    expect(await result).toEqual(
+      confirmed
+        ? { ok: true, data: { ok: true } }
+        : { ok: false, code: 'denied', message: 'User denied', retryable: false, isError: true },
+    );
     expect(fetch).toHaveBeenCalledTimes(confirmed ? 1 : 0);
     if (confirmed) expect(fetch.mock.calls[0][1].headers.get('authorization')).toBe('Bearer user');
     expect(events[1].state).toBe(confirmed ? 'confirmed' : 'rejected');
@@ -45,7 +49,7 @@ describe('assistant host tools', () => {
         { method: 'POST', path: '/api/websites/123/reset' },
         { credentials: new Headers(), interaction, fetch },
       ),
-    ).toBe('User denied');
+    ).toMatchObject({ ok: false, code: 'denied', isError: true });
     expect(events[1].state).toBe('expired');
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -57,27 +61,41 @@ describe('assistant host tools', () => {
     };
     await executeTool(
       'show_chart',
-      { component: { type: 'WebsiteCompareChart', props: { websiteIds: ['a', 'b'] } } },
+      {
+        component: {
+          type: 'WebsiteCompareChart',
+          props: {
+            websiteIds: [
+              '11111111-1111-4111-8111-111111111111',
+              '22222222-2222-4222-8222-222222222222',
+            ],
+            metric: 'visitors',
+          },
+        },
+      },
       input,
     );
     await executeTool('open_link', { label: 'Board', href: '/boards/123' }, input);
     expect(events.map(part => part.type)).toEqual(['chart', 'link']);
     await expect(
       executeTool('show_chart', { component: { type: 'Script' } }, input),
-    ).rejects.toThrow('Chart type denied');
+    ).resolves.toMatchObject({ ok: false, code: 'invalid_chart' });
     await expect(
       executeTool('open_link', { label: 'Bad', href: '//evil.com' }, input),
     ).rejects.toThrow('Invalid link');
     await expect(
       executeTool('umami_api', { method: 'GET', path: '/api/auth/login' }, input),
-    ).rejects.toThrow('API path or method denied');
+    ).resolves.toMatchObject({ ok: false, code: 'invalid_arguments' });
   });
   it('preserves an explicit comparison range through show_chart', async () => {
     const events: any[] = [];
     const component = {
       type: 'WebsiteCompareChart',
       props: {
-        websiteIds: ['a', 'b'],
+        websiteIds: [
+          '11111111-1111-4111-8111-111111111111',
+          '22222222-2222-4222-8222-222222222222',
+        ],
         metric: 'visitors',
         unit: 'day',
         startAt: Date.parse('2026-01-01T00:00:00Z'),
@@ -108,7 +126,8 @@ describe('assistant host tools', () => {
         interaction: new Interaction(vi.fn(), new AbortController().signal),
       },
     );
-    expect(Buffer.byteLength(result)).toBeLessThanOrEqual(32768);
+    expect(result).toMatchObject({ ok: false, code: 'result_too_large', isError: true });
+    expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(32768);
     expect(fetch.mock.calls[0][0].search).toBe('?includeTeams=true');
     expect(fetch.mock.calls[0][1].redirect).toBe('error');
   });

@@ -9,6 +9,7 @@ import {
 import { store, summary } from './store';
 import { runAssistant } from './runtime';
 import { executeTool, Interaction } from './tools';
+import { advanceTurn, clearResults, finishTurn } from './analytics/results';
 
 type Context = { params: Promise<{ chatId?: string }> };
 type Turn = { userId: string; controller: AbortController; interaction: Interaction };
@@ -67,6 +68,7 @@ export async function deleteChat(request: Request, context: Context): Promise<Re
   if (running.has(result.chatId))
     return json({ error: 'Cancel the active turn before deleting this chat' }, 409);
   await store.delete(result.userId, result.chatId);
+  clearResults(result.userId, result.chatId);
   return json({ ok: true });
 }
 export async function reply(request: Request, context: Context): Promise<Response> {
@@ -114,6 +116,7 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
   }
   if (running.has(chatId)) return json({ error: 'Chat already running' }, 409);
   if (running.size >= 4) return json({ error: 'Assistant busy' }, 429);
+  const toolContext = advanceTurn(userId, chatId);
   const controller = new AbortController();
   let parts: AssistantPart[] = [];
   let output: ReadableStreamDefaultController<Uint8Array>;
@@ -180,7 +183,8 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
               session: chat.piSession,
               signal: controller.signal,
               emit,
-              tool: (name, args) => executeTool(name, args, { credentials, interaction }),
+              tool: (name, args) =>
+                executeTool(name, args, { credentials, interaction, context: toolContext }),
             });
             failure = outcome.error;
             session = outcome.session;
@@ -188,6 +192,7 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
         } catch {
           failure = 'Assistant failed';
         } finally {
+          finishTurn(toolContext);
           clearTimeout(timeout);
           // Resolve any outstanding interactions and stop running tools on every terminal path.
           const cancelled = controller.signal.aborted || failure === 'Cancelled';

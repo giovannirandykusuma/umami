@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { expect, it, vi } from 'vitest';
 vi.mock('@/lib/prisma', () => ({ default: {} }));
@@ -72,6 +73,56 @@ it('bridges tool calls and forwards start/end', async () => {
     'running',
     'done',
   ]);
+});
+it.each([
+  'analytics_schema',
+  'find_people',
+  'query_series',
+  'query_breakdown',
+  'query_totals',
+  'unknown_tool',
+])('bridges only approved analytics names (%s)', async name => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'assistant-runtime-test-'));
+  const bridge = resolve(dir, 'bridge.mjs');
+  writeFileSync(
+    bridge,
+    readFileSync(options.bridge, 'utf8').replaceAll("'umami_api'", JSON.stringify(name)),
+  );
+  const tool = vi.fn().mockResolvedValue({ ok: true, data: {} });
+  try {
+    const outcome = await runAssistantProcess(
+      { message: 'tool', session: null, signal: new AbortController().signal, emit: vi.fn(), tool },
+      { ...options, bridge },
+    );
+    if (name === 'unknown_tool') {
+      expect(outcome.error).toBeDefined();
+      expect(tool).not.toHaveBeenCalled();
+    } else {
+      expect(outcome.error).toBeUndefined();
+      expect(tool).toHaveBeenCalledWith(name, { method: 'GET', path: '/api/websites' });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+it('denies an unknown bridge name even after an allowed execution start', async () => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'assistant-runtime-denial-'));
+  const bridge = resolve(dir, 'bridge.mjs');
+  writeFileSync(
+    bridge,
+    readFileSync(options.bridge, 'utf8').replace("name: 'umami_api'", "name: 'unknown_tool'"),
+  );
+  const tool = vi.fn();
+  try {
+    const outcome = await runAssistantProcess(
+      { message: 'tool', session: null, signal: new AbortController().signal, emit: vi.fn(), tool },
+      { ...options, bridge },
+    );
+    expect(outcome.error).toBeDefined();
+    expect(tool).not.toHaveBeenCalled();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 it('aborts a running child and returns its saved session', async () => {
   const controller = new AbortController();

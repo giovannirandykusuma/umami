@@ -9,5 +9,20 @@ describe('assistant chart instructions', () => {
     expect(prompt).toContain('startAt,endAt');
     expect(prompt).toContain('Unix milliseconds');
     expect(prompt).toContain('global date selection');
+    for (const instruction of [
+      'analytics_schema',
+      'find_people',
+      'session data',
+      'distinctId',
+      'ask_user',
+      'same resultId',
+      'tracked clicks',
+      'first/last activity',
+      'truncated',
+      'identified users',
+      'ui.page_viewed',
+      'api.*',
+    ])
+      expect(prompt).toContain(instruction);
   });
 });

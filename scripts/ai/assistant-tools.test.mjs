@@ -27,13 +27,29 @@ test('registers exactly the assistant tool allowlist and blocks every other tool
   });
   assert.deepEqual(
     tools.map(t => t.name),
-    ['umami_api', 'ask_user', 'show_chart', 'open_link'],
+    [
+      'umami_api',
+      'ask_user',
+      'show_chart',
+      'open_link',
+      'analytics_schema',
+      'find_people',
+      'query_series',
+      'query_breakdown',
+      'query_totals',
+    ],
   );
   assert.deepEqual(handlers.tool_call({ toolName: 'bash' }), {
     block: true,
     reason: 'Tool denied',
   });
-  assert.equal(handlers.tool_call({ toolName: 'umami_api' }), undefined);
+  for (const name of extension.names)
+    assert.equal(handlers.tool_call({ toolName: name }), undefined);
+  for (const name of ['unknown_tool', 'query_sql', '', undefined])
+    assert.deepEqual(handlers.tool_call({ toolName: name }), {
+      block: true,
+      reason: 'Tool denied',
+    });
 });
 test('bridges input with the exact host title and returns host text', async () => {
   const tools = [];

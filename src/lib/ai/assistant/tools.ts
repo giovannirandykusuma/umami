@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { AssistantPart, AssistantReply } from './protocol';
+import { AnalyticsError } from './analytics/filters';
+import { analyticsNames, queryAnalytics } from './analytics/query';
+import { chartPart } from './analytics/chart';
+import type { ToolContext } from './analytics/results';
 
 type Pending = { part: AssistantPart; resolve: (reply?: AssistantReply) => void };
 export class Interaction {
@@ -59,19 +63,54 @@ export function truncate(value: unknown, bytes: number) {
     ? text
     : buffer.subarray(0, bytes - 20).toString('utf8') + '\n[truncated]';
 }
-export async function executeTool(
-  name: string,
-  args: any,
-  input: {
-    credentials: Headers;
-    interaction: Interaction;
-    fetch?: typeof fetch;
-  },
-) {
+export async function executeTool(name: string, args: any, input: ToolInput): Promise<any> {
+  try {
+    return await execute(name, args, input);
+  } catch (error) {
+    if (!['umami_api', 'show_chart', ...analyticsNames].includes(name)) throw error;
+    const known = error instanceof AnalyticsError;
+    return {
+      ok: false,
+      code: known ? error.code : 'invalid_arguments',
+      message: known ? error.message : 'Invalid tool arguments or request failed',
+      ...(known && error.path ? { path: error.path } : {}),
+      retryable: false,
+      isError: true,
+    };
+  }
+}
+type ToolInput = {
+  credentials: Headers;
+  interaction: Interaction;
+  fetch?: typeof fetch;
+  context?: ToolContext;
+};
+async function execute(name: string, args: any, input: ToolInput): Promise<any> {
   const { interaction } = input;
   const id = randomUUID();
   if (!args || typeof args !== 'object' || Array.isArray(args))
     throw new Error('Invalid arguments');
+  if (analyticsNames.includes(name)) {
+    if (!input.context) throw new AnalyticsError('denied', 'Trusted handler context required');
+    try {
+      const data = await queryAnalytics(name, args, input.context, async (path, query) => {
+        const result = await execute('umami_api', { method: 'GET', path, query }, input);
+        if (!result.ok) throw result;
+        return result.data;
+      });
+      if (Buffer.byteLength(JSON.stringify(data)) > 8192)
+        throw new AnalyticsError('result_too_large', 'Result exceeds 8 KiB; narrow the query');
+      return {
+        ok: true,
+        data,
+        ...(data.empty ? { empty: true } : {}),
+        ...(data.truncated ? { truncated: true } : {}),
+      };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'ok' in error && error.ok === false) return error;
+      throw error;
+    }
+  }
   if (name === 'umami_api') {
     if (
       !['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(args.method) ||
@@ -95,7 +134,14 @@ export async function executeTool(
         ...part,
         state: accepted ? 'confirmed' : answer ? 'rejected' : 'expired',
       });
-      if (!accepted) return 'User denied';
+      if (!accepted)
+        return {
+          ok: false,
+          code: 'denied',
+          message: 'User denied',
+          retryable: false,
+          isError: true,
+        };
     }
     if (interaction.signal.aborted) throw new Error('Cancelled');
     const port = process.env.PORT || '3000';
@@ -138,7 +184,43 @@ export async function executeTool(
     } finally {
       await reader?.cancel();
     }
-    return truncate(`${response.status} ${Buffer.concat(chunks).toString('utf8')}`, 32768);
+    if (!response.ok)
+      return {
+        ok: false,
+        status: response.status,
+        code: 'http_error',
+        message: `API request failed (${response.status})`,
+        retryable: response.status === 429 || response.status >= 500,
+        isError: true,
+      };
+    if (length >= 32768)
+      return {
+        ok: false,
+        status: response.status,
+        code: 'result_too_large',
+        message: 'API response exceeds limit; narrow the query',
+        retryable: false,
+        isError: true,
+      };
+    const text = Buffer.concat(chunks).toString('utf8');
+    let data: unknown;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      return {
+        ok: false,
+        status: response.status,
+        code: 'http_error',
+        message: 'API returned an invalid JSON response',
+        retryable: false,
+        isError: true,
+      };
+    }
+    return {
+      ok: true,
+      data,
+      ...(data === null || (Array.isArray(data) && !data.length) ? { empty: true } : {}),
+    };
   }
   if (name === 'ask_user') {
     if (
@@ -170,18 +252,9 @@ export async function executeTool(
     return answer?.kind === 'question' ? answer.answer : 'User did not answer';
   }
   if (name === 'show_chart') {
-    if (
-      ![
-        'WebsiteCompareChart',
-        'WebsiteChart',
-        'WebsiteMetricsBar',
-        'MetricsTable',
-        'WorldMap',
-      ].includes(args.component?.type)
-    )
-      throw new Error('Chart type denied');
-    interaction.emit({ type: 'chart', id, title: args.title, component: args.component });
-    return 'Chart displayed';
+    const part = chartPart(args, input.context, id);
+    interaction.emit(part);
+    return { ok: true, status: 'queued', partId: id };
   }
   if (name === 'open_link') {
     if (
