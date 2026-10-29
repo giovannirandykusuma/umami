@@ -103,3 +103,15 @@ R2 worker reports both judge findings fixed with six pre-fix regression cases, s
 ## [2026-10-29] 20261029-1504/analytics-tools-r2 | Authorized narrow review recovery
 
 Two fresh judges reproduced functional green but rejected unrelated runtime line wrapping under explicit judge scope rule. Randy selected narrow recovery: preserve implementation, fresh worker removes only unrelated hunk and investigates recurring formatter, then fresh review. No deployment/model calls authorized. Two low findings note load-sensitive unchanged query import and runtime cancellation test; run verification serially.
+
+## [2026-10-29] 20261029-1504/analytics-scope-recovery | Backend merged
+
+Merged a4cb79e38 after fresh ACCEPT with zero findings and final merged-tree gate exit0. Judge reproduced347 broad tests,7 enabled real PG integration zero skips,62 affected, registry3, exact three baseline TS errors, fixed regression negative controls, and stable20-path hash manifest with only authorized runtime hunks. Archived completed recovery workspace preserving branch. Launched result-chart-ui and independent offline analytics-eval workers from this merge. Live model evaluation and deployment remain unauthorized.
+
+## [2026-10-29] 20261029-1504/result-chart-ui | Authorize fixture and capture updates
+
+UI worker passes18 unit tests and baseline-only TS checks but browser fixture500s because Turbopack rejects external worktree dependency symlinks. MAIN approved narrow paseo.json ai-ui-fixture --webpack flag and scripts/ai/capture-ui.mjs result-chart/table fixtures/screenshots; Owns expanded. Only restart owned Paseo fixture. Browser/visual gates remain required, no product deployment or model calls.
+
+## [2026-10-29] 20261029-1504/analytics-eval | Correct standalone-script acceptance gate
+
+Fresh judges0001/0002 found no source defects and reproduced offline evaluator checks; affected-tests first lacked dependencies then delegated to Vitest --changed, which selected zero tests for standalone .mjs plus docs and exited1. MAIN corrects applicability: generic Vitest gate is N/A for this two-file lane, not a failing implementation test. Required gates remain node syntax, evaluator self-test (nine mutation controls), offline transcript/parity/malformed/opt-in/comparison probes, diff check, scope review. Fresh judge required; no override of existing REJECT, no live model spend.
