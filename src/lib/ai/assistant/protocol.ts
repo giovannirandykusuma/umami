@@ -70,7 +70,13 @@ export type AssistantPart =
     }
   | { type: 'chart'; id: string; title?: string; component: BoardComponentConfig }
   /** Chart of a host-executed query result (never model-authored data). Whole part ≤ 8 KiB. */
-  | { type: 'result-chart'; id: string; title?: string; kind: AssistantChartKind; series: AssistantSeries }
+  | {
+      type: 'result-chart';
+      id: string;
+      title?: string;
+      kind: AssistantChartKind;
+      series: AssistantSeries;
+    }
   | { type: 'link'; id: string; label: string; href: string }
   | {
       type: 'confirm';
