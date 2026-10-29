@@ -1,0 +1,23 @@
+# Install only in a dedicated namespace labeled analyst-verifier-isolation=true.
+# The app verification listener must serve ONLY /exchange, /canvas and /receipt.
+# No DNS is needed: configure its pinned ClusterIP as the application origin.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: analyst-verifier-deny-by-default
+  namespace: analyst-verifier
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              analyst-verification-app: "true"
+          podSelector:
+            matchLabels:
+              app: analyst-verification-listener
+      ports:
+        - protocol: TCP
+          port: 4319

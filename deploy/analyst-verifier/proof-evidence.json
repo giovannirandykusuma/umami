@@ -1,0 +1,62 @@
+{
+  "kind": "synthetic-local-docker-not-production",
+  "command": "sh scripts/ai/verifier/docker-proof.sh",
+  "exit": 0,
+  "runtime": "Docker Desktop 29.4.1",
+  "baseImageDigest": "sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27",
+  "network": {
+    "internal": true,
+    "peers": ["fixture", "verifier"],
+    "extraNetworks": false,
+    "publishedPorts": false
+  },
+  "verifier": {
+    "uid": 10001,
+    "readOnlyRootfs": true,
+    "capDrop": ["ALL"],
+    "privileged": false,
+    "noNewPrivileges": true,
+    "hostMounts": false,
+    "memoryBytes": 1073741824,
+    "shmBytes": 134217728,
+    "tmpfsBytes": 134217728
+  },
+  "tcpDenials": {
+    "ports": [80, 443],
+    "targets": [
+      "1.1.1.1",
+      "example.com",
+      "169.254.169.254",
+      "169.254.1.1",
+      "172.18.0.1",
+      "host.docker.internal"
+    ],
+    "allDenied": true
+  },
+  "httpInternetDenied": true,
+  "externalBrowserResourcesDenied": 2,
+  "externalRedirect": {
+    "fixtureStatus": 302,
+    "location": "http://1.1.1.1/",
+    "browserNavigationRejected": true
+  },
+  "captures": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "sha256": "f501e28bcb5efb3007f31a4ed8a78a66c8ffd42298ca8e37dc2f9c46d6cf3403"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "sha256": "d145dfd6e8e413812ba25fca8ea38f36edfdc1594f861d48415d051adb5ac49e"
+    }
+  ],
+  "cleanup": "owned disposable containers, network and proof image removed by trap",
+  "limitations": [
+    "two-service peer boundary",
+    "HTTP internal topology only",
+    "not production HTTPS or CNI validation",
+    "no actual widget integration or model inspection"
+  ]
+}

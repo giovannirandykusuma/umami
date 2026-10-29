@@ -1,0 +1,8 @@
+FROM mcr.microsoft.com/playwright:v1.63.0-noble
+WORKDIR /proof
+RUN npm init -y && npm install --ignore-scripts --no-audit --no-fund @playwright/test@1.63.0
+COPY src/lib/analyst-verifier ./src/lib/analyst-verifier
+COPY scripts/ai/verifier ./scripts/ai/verifier
+USER 10001:10001
+ENV HOME=/tmp PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+CMD ["node", "scripts/ai/verifier/container-proof.mjs"]
