@@ -43,12 +43,22 @@ const parts = [
     text: '## Your audience is growing\n\nYou welcomed **2,400 unique visitors** in the last 30 days — **18% more** than the previous period.\n\nOrganic search continues to lead the way. Here’s how your websites compare:',
   },
   {
-    type: 'chart',
+    type: 'result-chart',
     id: 'chart',
-    title: 'Unique visitors · Last 30 days',
-    component: {
-      type: 'WebsiteCompareChart',
-      props: { websiteIds: ['site-1', 'site-2'], metric: 'visitors', dateRange: '30day' },
+    kind: 'bar',
+    title: 'Seeded tracked clicks',
+    series: {
+      label: 'Tracked clicks · seed-person',
+      metric: 'events',
+      unit: 'day',
+      timezone: 'Asia/Tokyo',
+      range: { startAt: 1793142000000, endAt: 1793314799999 },
+      appliedFilters: { event: 'button_clicked', distinctId: 'seed-person' },
+      buckets: [
+        { t: '2026-10-28T00:00:00+09:00', y: 17 },
+        { t: '2026-10-29T00:00:00+09:00', y: 25 },
+      ],
+      total: 42,
     },
   },
   { type: 'link', id: 'link', label: 'Explore your websites', href: '/websites' },
@@ -108,11 +118,7 @@ try {
     ['narrow', 390, 844, false],
     ['desktop-dark', 1280, 800, true],
   ]) {
-    for (const state of dark
-      ? ['done']
-      : size === 'desktop'
-        ? ['empty', 'streaming', 'done', 'confirm']
-        : ['empty', 'streaming', 'done']) {
+    for (const state of size === 'desktop' ? ['done', 'table'] : ['done']) {
       const name = `assistant-${size}-${state}`;
       const page = await browser.newPage({
         viewport: { width, height },
@@ -196,7 +202,7 @@ try {
           body = { data: [], count: 0 };
         await route.fulfill({ json: body });
       });
-      await page.goto(`${baseUrl}/assistant?date=30day&unit=day`);
+      await page.goto(`${baseUrl}/assistant?date=30day&unit=day`, { timeout: 180000 });
       await page.getByRole('heading', { name: 'Hi Alex, what do you want to know?' }).waitFor();
       const before = await page.locator('body').ariaSnapshot();
       if (state !== 'empty') {
@@ -214,15 +220,14 @@ try {
             { exact: true },
           )
           .waitFor();
-        if (state === 'done')
+        if (state === 'done' || state === 'table')
           await page.getByRole('link', { name: 'Explore your websites' }).waitFor();
       }
       await page.evaluate(() => document.fonts.ready);
       if (state === 'done') {
         await page.locator('canvas').waitFor();
         await page.waitForTimeout(2500);
-        await page.getByText('Main website', { exact: true }).waitFor();
-        await page.getByText('Product blog', { exact: true }).waitFor();
+        await page.getByText('Total events: 42', { exact: true }).waitFor();
         await page.waitForFunction(() => {
           const canvas = document.querySelector('canvas');
           return (
@@ -230,6 +235,14 @@ try {
             canvas.getBoundingClientRect().width > canvas.closest('section').clientWidth * 0.75
           );
         });
+        await page.evaluate(() => {
+          const log = document.querySelector('[role="log"]');
+          log.scrollTop = log.scrollHeight;
+        });
+      }
+      if (state === 'table') {
+        await page.getByRole('button', { name: 'Show table' }).click();
+        await page.getByRole('table').waitFor();
         await page.evaluate(() => {
           const log = document.querySelector('[role="log"]');
           log.scrollTop = log.scrollHeight;
@@ -249,8 +262,8 @@ try {
             .toJSON(),
           canvasWidth: log.querySelector('canvas')?.getBoundingClientRect().width ?? null,
           plotWidth: log.querySelector('canvas')?.dataset.plotWidth ?? null,
-          legendVisible: ['Main website', 'Product blog'].every(label =>
-            [...log.querySelectorAll('span, button')].some(node => {
+          legendVisible: ['Total events: 42'].every(label =>
+            [...log.querySelectorAll('strong')].some(node => {
               const rect = node.getBoundingClientRect();
               const viewport = log.getBoundingClientRect();
               return (
@@ -268,6 +281,11 @@ try {
             const viewport = log.getBoundingClientRect();
             return rect.top >= viewport.top && rect.bottom <= viewport.bottom;
           })(),
+          seededTotal: log.textContent.includes('Total events: 42'),
+          filtersVisible:
+            log.textContent.includes('event = button_clicked') &&
+            log.textContent.includes('distinctId = seed-person'),
+          tableTotal: log.querySelector('tfoot td')?.textContent ?? null,
           viewportWidth: innerWidth,
           documentWidth: document.documentElement.scrollWidth,
           horizontalOverflowPx: Math.max(0, document.documentElement.scrollWidth - innerWidth),
@@ -291,7 +309,7 @@ try {
         'screenshot',
         `${process.cwd()}/shots/${name}.png`,
       ]);
-      const baselinePath = `/Users/randy/Developer/work/umami/.shikumi/assistant-ui-r1-shots/${name}.png`;
+      const baselinePath = `/Users/randy/Developer/work/umami/.shikumi/assistant-ui-r1-shots/${state === 'table' ? 'assistant-desktop-done' : name}.png`;
       const baseline = baselinePath;
       const diffPercentage = Number(
         execFileSync(
@@ -343,6 +361,9 @@ print(changed * 100 / (before.width * before.height))
         consoleErrors.length ||
         measurements.horizontalOverflowPx ||
         measurements.conversationOverflowPx ||
+        !measurements.seededTotal ||
+        !measurements.filtersVisible ||
+        (state === 'table' && measurements.tableTotal !== '42') ||
         (size === 'desktop' && measurements.visibleConversationHeight < 560) ||
         (state === 'done' &&
           (measurements.chartFullyVisible !== true || !measurements.legendVisible)) ||

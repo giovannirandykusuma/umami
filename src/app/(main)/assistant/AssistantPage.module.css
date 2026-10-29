@@ -314,6 +314,40 @@
 .chartBody canvas {
   max-width: 100%;
 }
+.resultMeta {
+  margin: 4px 0;
+  color: var(--base600);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.resultPlot {
+  height: 240px;
+  min-width: 0;
+  margin-top: 12px;
+}
+.resultPlot > div {
+  height: 100%;
+}
+.resultTable {
+  max-width: 100%;
+  overflow-x: auto;
+  margin-top: 12px;
+}
+.resultTable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.resultTable th,
+.resultTable td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--base300);
+}
+.resultTable caption {
+  text-align: left;
+  padding: 8px;
+}
 
 .link {
   display: inline-flex;

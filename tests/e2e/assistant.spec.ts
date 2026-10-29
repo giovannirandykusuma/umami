@@ -117,6 +117,82 @@ test('global assistant: history, markdown, rename and delete', async ({ page }) 
   ).toBeVisible();
 });
 
+test('result-backed chart preserves seeded totals and filters with a table fallback', async ({
+  page,
+}) => {
+  const parts = [
+    {
+      type: 'result-chart',
+      id: 'seeded',
+      kind: 'bar',
+      title: 'Seeded tracked clicks',
+      series: {
+        label: 'Tracked clicks · seed-person',
+        metric: 'events',
+        unit: 'day',
+        timezone: 'Asia/Tokyo',
+        range: { startAt: 1793142000000, endAt: 1793314799999 },
+        appliedFilters: { event: 'button_clicked', distinctId: 'seed-person' },
+        buckets: [
+          { t: '2026-10-28T00:00:00+09:00', y: 17 },
+          { t: '2026-10-29T00:00:00+09:00', y: 25 },
+        ],
+        total: 42,
+      },
+    },
+    {
+      type: 'chart',
+      id: 'legacy-invalid',
+      component: { type: 'WebsiteChart', props: { websiteId: 'misplaced' } },
+    },
+  ];
+  const websiteRequests: string[] = [];
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.includes('/websites/')) websiteRequests.push(path);
+    let body: any = {};
+    if (path === '/api/auth/verify')
+      body = { id: 'user-1', username: 'Alex', role: 'admin', isAdmin: true };
+    else if (path === '/api/config')
+      body = { cloudMode: false, updatesDisabled: true, telemetryDisabled: true };
+    else if (path === '/api/ai/assistant/chats') body = [summary];
+    else if (path === '/api/ai/assistant/chats/chat-1')
+      body = {
+        ...summary,
+        messages: [
+          { id: 'result', role: 'assistant', parts, status: 'done', createdAt: summary.createdAt },
+        ],
+      };
+    else if (path.endsWith('/websites') || path.endsWith('/teams')) body = { data: [], count: 0 };
+    await route.fulfill({ json: body });
+  });
+  await page.goto('/assistant');
+  await page.getByRole('button', { name: summary.title, exact: true }).click();
+  const chart = page.getByRole('img', { name: 'Tracked clicks · seed-person: total 42 events' });
+  await expect(chart.locator('canvas')).toBeVisible();
+  expect(
+    await chart.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
+      const context = canvas.getContext('2d')!;
+      if (canvas.getBoundingClientRect().height <= 100) return false;
+      return context
+        .getImageData(0, 0, canvas.width, canvas.height)
+        .data.some((value, index) => index % 4 === 3 && value > 0);
+    }),
+  ).toBe(true);
+  await expect(page.getByText('Total events: 42')).toBeVisible();
+  await expect(page.getByText(/Filters:/)).toContainText('distinctId = seed-person');
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'invalid legacy chart configuration' }),
+  ).toBeVisible();
+  await expect(page.getByText('Select a website')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show table' }).click();
+  await expect(page.getByRole('table')).toContainText('42');
+  await expect(page.getByRole('row', { name: '2026-10-28T00:00:00+09:00 17' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show chart' }).click();
+  await expect(chart.locator('canvas')).toBeVisible();
+  expect(websiteRequests).toEqual([]);
+});
+
 test('live deltas, confirm/question POSTs and Escape cancellation', async ({ page }) => {
   const replies: any[] = [];
   let cancelled = false;

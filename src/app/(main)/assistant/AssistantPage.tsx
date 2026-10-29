@@ -20,6 +20,7 @@ import { getApiUrl } from '@/lib/api-url';
 import { getClientAuthToken } from '@/lib/client';
 import { BoardComponentRenderer } from '../boards/[boardId]/BoardComponentRenderer';
 import { readAssistantStream } from './stream';
+import { ResultChart } from './ResultChart';
 import styles from './AssistantPage.module.css';
 
 // Streaming inserts charts during layout; avoid animating from their initial narrow measurement.
@@ -699,7 +700,25 @@ export function Part({
           {part.result && <pre>{part.result}</pre>}
         </details>
       );
+    case 'result-chart':
+      return <ResultChart part={part} />;
     case 'chart':
+      if (
+        !part.component ||
+        (['WebsiteChart', 'WebsiteMetricsBar', 'WorldMap', 'MetricsTable'].includes(
+          part.component.type,
+        ) &&
+          !(part.component.websiteId || part.component.entityId)) ||
+        (part.component.type === 'WebsiteCompareChart' &&
+          (!Array.isArray(part.component.props?.websiteIds) ||
+            part.component.props.websiteIds.length < 2))
+      )
+        return (
+          <p role="alert">
+            Unable to display chart: invalid legacy chart configuration. Ask Assistant to generate a
+            new chart.
+          </p>
+        );
       return (
         <section className={styles.chart}>
           <h3>{part.title || part.component.title || 'Analytics'}</h3>

@@ -9,6 +9,57 @@ vi.mock('../boards/[boardId]/BoardComponentRenderer', () => ({
 }));
 
 describe('assistant timeline', () => {
+  const reply = vi.fn();
+  it('renders result metadata and a table without a website dependency', async () => {
+    render(
+      <Part
+        part={{
+          type: 'result-chart',
+          id: 'result',
+          kind: 'table',
+          series: {
+            label: 'Tracked clicks',
+            metric: 'events',
+            unit: 'day',
+            timezone: 'Asia/Tokyo',
+            range: { startAt: 1793142000000, endAt: 1793314799999 },
+            appliedFilters: { event: 'button_clicked', distinctId: 'seed-person' },
+            buckets: [
+              { t: '2026-10-28T00:00:00+09:00', y: 17 },
+              { t: '2026-10-29T00:00:00+09:00', y: 25 },
+            ],
+            total: 42,
+          },
+        }}
+        active={false}
+        reply={reply}
+      />,
+    );
+    expect(screen.getByRole('table')).toHaveTextContent('42');
+    expect(screen.getByText(/Filters:/)).toHaveTextContent('event = button_clicked');
+    expect(screen.getByText(/Filters:/)).toHaveTextContent('distinctId = seed-person');
+    expect(screen.getByText(/28 Oct 2026/)).toHaveTextContent('Asia/Tokyo');
+    expect(screen.queryByText('Select a website')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show chart' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+  it('rejects legacy charts missing a website instead of opening the website selector', () => {
+    render(
+      <Part
+        part={{
+          type: 'chart',
+          id: 'invalid',
+          component: { type: 'WebsiteChart', props: { websiteId: 'misplaced' } },
+        }}
+        active={false}
+        reply={reply}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('invalid legacy chart configuration');
+    expect(screen.queryByText('Select a website')).not.toBeInTheDocument();
+  });
   it('ticks live activity from send time, switches after text/tools, and stops on unmount', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-28T12:00:00Z'));
