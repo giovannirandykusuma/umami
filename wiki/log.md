@@ -147,3 +147,11 @@ Stage1 foundation388f15ad3 and stage2 fixture verifier735d7df30 merged after fre
 ## [2026-10-30] analyst-cancel-recovery | One more opening-race round authorized
 
 Judge0002 rejected cancellation-winning openTask retry creating fresh authority for same in-flight turn; unrelated query timeout low. Stopped and reported as required. Randy directly chose One more round in Ashiato MAIN01a1882b, relayed message214d6f6a-a241-4a2c-8fac-08a4b968afd4. Same retained worker/Owns; only opening race plus handler regression: exactly one cancelled task/no model or tool; independent later turn separately allowed. Fresh Solmedium judge, stop again on REJECT. No push/deploy/paid calls.
+
+## [2026-10-30] analyst-main-integration | Continue ordered integration seams
+
+Worker completed host-authoritative task SSE seam, forked on size of remaining fixture/isolated adapter/native chart receipt work and BoardViewColumn ownership. MAIN chose continue existing explicit four-gap integration lane sequentially, no scope expansion. BoardViewColumn remains for preserved UI continuation; worker supplies exact contract, implements only owned chart glue. B3/D2 not claimed until actual UI restored. Fresh integration review required, flags off, no paid/push/deploy.
+
+## [2026-10-30] analyst-integration-r2 | Authorize bounded offline runtime seam
+
+Worker fixed expired task authority and post-tool persisted SSEstatus; remaining offline fixture needs runtime selector outside original Owns. MAIN expanded runtime.ts/runtime.test.ts narrowly for positively verified synthetic-only offline provider with no live fallback, refusal tests outside fixture, normal native Pi confinement preserved. Docker networknone accepted only with actual bounded private IPC app/capability transport; otherwise prior two-peer internal network topology with real egress denial proof. A callback claiming isolated is insufficient. No production/newcredentials/paidcalls/push/deploy.
