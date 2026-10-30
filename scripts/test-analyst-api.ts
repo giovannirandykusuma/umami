@@ -1292,6 +1292,7 @@ async function run(client: any) {
     );
     assert.equal(bundleBoard.userId, ids.owner);
   });
+
   const bundledExec = await call(
     execute.POST,
     'POST',
@@ -1325,6 +1326,97 @@ async function run(client: any) {
       analyses: afterBundle.analyses + 2,
       revisions: afterBundle.revisions + 2,
     });
+  });
+  // Task fence: cancellation and commit linearize on the analyst_task row lock.
+  const { commitBundle: commitFenced, TaskFenceError } = await import('@/queries/prisma/analysis');
+  const tasks = await import('@/lib/ai/assistant/analyst/task');
+  const fencedChat = randomUUID();
+  await client.aiChat.create({ data: { id: fencedChat, userId: ids.owner, title: 'fence' } });
+  const openFenced = async () => {
+    const t = await tasks.ensureTask(ids.owner, fencedChat, 'fence');
+    return { userId: ids.owner, chatId: fencedChat, taskId: t.id };
+  };
+  const fencedBundle = async (scope: any, key: string, record?: (tx: any) => Promise<void>) => {
+    const body = bundleBody({ taskId: scope.taskId });
+    // The route's zod parse supplies status: 'draft'; this direct call must supply it itself.
+    body.analyses = body.analyses.map(a => ({ ...a, status: 'draft' }));
+    const validated = await (await import('@/lib/analyst/bundle')).validateBundle(
+      { user: { id: ids.owner, role: 'user', isAdmin: false } } as any,
+      body,
+    );
+    return commitFenced(
+      { ...validated, userId: ids.owner, operationKey: key },
+      { chatId: fencedChat, record },
+    );
+  };
+  const scopeA = await openFenced();
+  await tasks.cancelTask(scopeA);
+  const beforeFence = await counts();
+  const lost = await fencedBundle(scopeA, 'fence-1').catch(e => e);
+  const afterFence = await counts();
+  check('cancelled task: fenced bundle commits no board/analysis/operation', () => {
+    assert.ok(lost instanceof TaskFenceError, String(lost));
+    assert.deepEqual(afterFence, beforeFence);
+  });
+  const scopeP = await openFenced();
+  const recorded = await fencedBundle(scopeP, 'fence-provenance', tx =>
+    tasks.updateTaskInTx(tx, scopeP, t => ({ ...t, operationKeys: ['fence-provenance'] })),
+  );
+  await tasks.cancelTask(scopeP);
+  const lateWrite = await tasks
+    .updateTask(scopeP, t => ({ ...t, operationKeys: ['late'] }))
+    .catch(e => e);
+  const provenance = await tasks.getTask(scopeP);
+  check(
+    'winning commit records provenance in-transaction; cancelled task rejects late writes',
+    () => {
+      assert.ok(recorded.result.board.id);
+      assert.equal(provenance?.status, 'cancelled');
+      assert.deepEqual(provenance?.operationKeys, ['fence-provenance']);
+      assert.equal(lateWrite?.code, 'not_found');
+    },
+  );
+  const outcomes = new Set<string>();
+  for (let round = 0; round < 6; round++) {
+    const scope = await openFenced();
+    // Rounds rotate cancel-first, commit-first and truly concurrent interleavings.
+    const mode = ['cancel-first', 'commit-first', 'concurrent'][round % 3];
+    const before = await counts();
+    const commitOnce = () => fencedBundle(scope, `fence-race-${round}`).catch(e => e);
+    let outcome: any;
+    if (mode === 'cancel-first') {
+      await tasks.cancelTask(scope);
+      outcome = await commitOnce();
+    } else if (mode === 'commit-first') {
+      outcome = await commitOnce();
+      await tasks.cancelTask(scope);
+    } else [outcome] = await Promise.all([commitOnce(), tasks.cancelTask(scope)]);
+    const after = await counts();
+    const stored = await tasks.getTask(scope);
+    outcomes.add(outcome instanceof TaskFenceError ? 'cancel-won' : 'commit-won');
+    check(`${mode} cancel/commit round ${round} is all-or-nothing; cancel stays terminal`, () => {
+      assert.equal(stored?.status, 'cancelled');
+      if (outcome instanceof TaskFenceError) assert.deepEqual(after, before);
+      else
+        assert.deepEqual(after, {
+          boards: before.boards + 1,
+          analyses: before.analyses + 2,
+          revisions: before.revisions + 2,
+        });
+    });
+    await tasks.pause(scope).catch(() => undefined);
+    await tasks.resume(scope).catch(() => undefined);
+    // ensureTask over a cancelled task must open a fresh one, never revive it.
+    const reopened = await tasks.ensureTask(ids.owner, fencedChat, 'reopen');
+    await tasks.cancelTask({ ...scope, taskId: reopened.id });
+    const revived = await tasks.getTask(scope);
+    check(`round ${round}: pause/resume/ensureTask after cancel do not revive the task`, () => {
+      assert.notEqual(reopened.id, scope.taskId);
+      assert.equal(revived?.status, 'cancelled');
+    });
+  }
+  check('both cancel-won and commit-won linearizations observed', () => {
+    assert.deepEqual([...outcomes].sort(), ['cancel-won', 'commit-won']);
   });
   const otherTaskCommit = await commit({
     ...bundleBody({ taskId: otherTask }),
@@ -1585,7 +1677,12 @@ async function run(client: any) {
       stdio: ['ignore', 'pipe', 'inherit'],
     },
   );
-  const restarted = JSON.parse(childOut.split('RESTART_RESULT ')[1]);
+  let restarted: any;
+  try {
+    restarted = JSON.parse(childOut.split('RESTART_RESULT ')[1]);
+  } catch (e) {
+    throw new Error(`Restart child printed no valid RESTART_RESULT: ${e}`);
+  }
   check(
     'restarted process executes persisted definitions with identical semantics and results',
     () => {

@@ -145,3 +145,79 @@ describe('assistant host tools', () => {
     expect(events[1].state).toBe('answered');
   });
 });
+
+describe('analyst-mode generic API authority', () => {
+  const input = (fetch: any, events: any[] = []) => ({
+    credentials: new Headers(),
+    interaction: new Interaction(p => events.push(p), new AbortController().signal),
+    fetch,
+    analyst: true,
+  });
+  it.each([
+    ['POST', '/api/boards'],
+    ['POST', '/api/boards/1'],
+    ['PUT', '/api/boards/1'],
+    ['PATCH', '/api/analyses/1'],
+    ['POST', '/api/analyses'],
+    ['POST', '/api/boards/bundle'],
+    ['POST', '/api/websites/1/shares'],
+    ['POST', '/api/teams/1/boards'],
+    ['DELETE', '/api/boards/1'],
+  ])('denies lifecycle write %s %s without asking or fetching', async (method, path) => {
+    const fetch = vi.fn();
+    const events: any[] = [];
+    const result = await executeTool('umami_api', { method, path }, input(fetch, events));
+    expect(result).toMatchObject({ ok: false, code: 'denied' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+  it('requires confirmation for other writes (POST is not harmless) and allows GET', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('{}'));
+    const events: any[] = [];
+    const pending = executeTool(
+      'umami_api',
+      { method: 'POST', path: '/api/websites' },
+      input(fetch, events),
+    );
+    await vi.waitFor(() => expect(events[0]?.type).toBe('confirm'));
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      await executeTool('umami_api', { method: 'GET', path: '/api/boards' }, input(fetch)),
+    ).toMatchObject({ ok: true });
+    pending.catch(() => undefined);
+  });
+  it('legacy (flag-off) behavior is unchanged: POST /api/boards is fetched without confirmation', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('{}'));
+    const interaction = new Interaction(vi.fn(), new AbortController().signal);
+    expect(
+      await executeTool(
+        'umami_api',
+        { method: 'POST', path: '/api/boards' },
+        { credentials: new Headers(), interaction, fetch },
+      ),
+    ).toMatchObject({ ok: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it('pauses only while a validated interaction is pending', async () => {
+    const calls: string[] = [];
+    const events: any[] = [];
+    const interaction = new Interaction(p => events.push(p), new AbortController().signal, 300000, {
+      pause: async () => calls.push('pause'),
+      resume: async () => calls.push('resume'),
+    });
+    const pending = interaction.wait({
+      type: 'question',
+      id: 'q',
+      question: 'Which?',
+      allowText: true,
+      state: 'pending',
+    });
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    expect(calls).toEqual(['pause']);
+    expect(interaction.reply({ kind: 'question', partId: 'forged', answer: 'x' })).toBe(false);
+    expect(calls).toEqual(['pause']);
+    expect(interaction.reply({ kind: 'question', partId: 'q', answer: 'A' })).toBe(true);
+    await pending;
+    expect(calls).toEqual(['pause', 'resume']);
+  });
+});

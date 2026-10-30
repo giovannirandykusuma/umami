@@ -285,6 +285,37 @@ export async function createConfirmation(args: {
   });
 }
 
+/** Raised when the owning analyst task is no longer active (or its turn aborted) at commit. */
+export class TaskFenceError extends Error {}
+
+/**
+ * Trusted server-side task fence, never accepted from request bodies. Inside the transaction it
+ * conditionally touches the task row (status running/awaiting_user), which takes the row lock
+ * until commit: a cancel that committed first makes the claim fail; a cancel issued later blocks
+ * on the lock and then sees the commit. Either way the bundle and the cancel are linearized at
+ * the task row and a cancelled task never gains a board, analysis, grant claim or operation.
+ */
+export interface TaskFence {
+  chatId: string;
+  signal?: AbortSignal;
+  /** Records task provenance in the same transaction, while the task row is still locked. */
+  record?: (tx: Tx, result: any) => Promise<void>;
+}
+
+async function claimTask(tx: Tx, userId: string, taskId: string | null, fence: TaskFence) {
+  if (fence.signal?.aborted || !taskId) throw new TaskFenceError('Task turn is not active');
+  const { count } = await tx.analystTask.updateMany({
+    where: {
+      id: taskId,
+      userId,
+      chatId: fence.chatId,
+      status: { in: ['running', 'awaiting_user'] },
+    },
+    data: { updatedAt: new Date() },
+  });
+  if (count !== 1) throw new TaskFenceError('Task is no longer active');
+}
+
 /**
  * Atomic metadata bundle: creates the new analyses (with revision history) and creates or
  * compare-and-sets the board in one transaction, recorded under the principal/task/key so a
@@ -294,11 +325,13 @@ export async function createConfirmation(args: {
  */
 export async function commitBundle(
   request: BundleRequest & { userId: string; operationKey: string; confirmationId?: string },
+  fence?: TaskFence,
 ) {
   const { userId, operationKey, confirmationId, ...bundle } = request;
   const taskId = bundle.taskId ?? null;
   const teamId = bundle.teamId ?? null;
   return idempotent(userId, taskId, operationKey, { ...bundle, confirmationId }, async tx => {
+    if (fence) await claimTask(tx, userId, taskId, fence);
     if (bundle.boardId) {
       if (!confirmationId)
         throw new AnalysisError('denied', 'A matching confirmation is required', 'confirmationId');
@@ -368,6 +401,10 @@ export async function commitBundle(
       });
     }
     const board = await tx.board.findUniqueOrThrow({ where: { id: boardId } });
-    return json({ board, analyses });
+    // An abort while the writes were awaited still wins: throwing here rolls everything back.
+    if (fence?.signal?.aborted) throw new TaskFenceError('Task turn was cancelled');
+    const result = json({ board, analyses });
+    await fence?.record?.(tx, result);
+    return result;
   });
 }

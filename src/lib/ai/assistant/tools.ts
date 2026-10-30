@@ -12,9 +12,20 @@ export class Interaction {
     readonly emit: (part: AssistantPart) => void,
     readonly signal: AbortSignal,
     readonly timeoutMs = 300000,
+    /** Server-owned pause hooks: only validated pending confirm/question parts pause the clock. */
+    readonly hooks?: { pause(): Promise<unknown>; resume(): Promise<unknown> },
   ) {}
-  wait(part: AssistantPart): Promise<AssistantReply | undefined> {
-    if (this.signal.aborted) return Promise.resolve(undefined);
+  async wait(part: AssistantPart): Promise<AssistantReply | undefined> {
+    if (this.signal.aborted) return undefined;
+    if (!this.hooks) return this.waitReply(part);
+    await this.hooks.pause();
+    try {
+      return await this.waitReply(part);
+    } finally {
+      await this.hooks.resume();
+    }
+  }
+  private waitReply(part: AssistantPart): Promise<AssistantReply | undefined> {
     return new Promise(resolve => {
       const finish = (reply?: AssistantReply) => {
         clearTimeout(timer);
@@ -84,7 +95,12 @@ type ToolInput = {
   interaction: Interaction;
   fetch?: typeof fetch;
   context?: ToolContext;
+  /** Host-set when the analyst lifecycle is active for this turn; never model-selectable. */
+  analyst?: boolean;
 };
+/** Canonical lifecycle resources: generic API writes to them would bypass task authority. */
+const LIFECYCLE_WRITE =
+  /^\/api\/(boards|analyses|analyst|analyst-verifier|shares|share)(\/|$)|\/(boards|shares)(\/|$)/i;
 async function execute(name: string, args: any, input: ToolInput): Promise<any> {
   const { interaction } = input;
   const id = randomUUID();
@@ -117,9 +133,19 @@ async function execute(name: string, args: any, input: ToolInput): Promise<any> 
       !validApiPath(args.path)
     )
       throw new Error('API path or method denied');
+    if (input.analyst && args.method !== 'GET' && LIFECYCLE_WRITE.test(args.path))
+      return {
+        ok: false,
+        code: 'denied',
+        message: 'Board, analysis and sharing writes must use the analyst tools',
+        retryable: false,
+        isError: true,
+      };
     if (
       args.method === 'DELETE' ||
-      (args.method === 'POST' && /\/(delete|reset)\/?$/.test(args.path))
+      (args.method === 'POST' && /\/(delete|reset)\/?$/.test(args.path)) ||
+      // Analyst mode: unknown writes are never assumed harmless, whatever the method.
+      (input.analyst && args.method !== 'GET')
     ) {
       const part: AssistantPart = {
         type: 'confirm',

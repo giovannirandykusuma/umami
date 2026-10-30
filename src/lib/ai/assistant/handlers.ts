@@ -10,6 +10,17 @@ import { store, summary } from './store';
 import { runAssistant } from './runtime';
 import { executeTool, Interaction } from './tools';
 import { advanceTurn, clearResults, finishTurn } from './analytics/results';
+import { isAnalystEnabled } from '@/lib/analyst/flags';
+import { ImageToolResult } from './runtime';
+import type { AnalystToolName } from './analyst/tools';
+import type { TaskScope } from './analyst/task';
+import { sanitize } from './analyst/sanitize';
+// DB-backed analyst modules load only when the default-off flag is enabled.
+const analystModules = async () => ({
+  ...(await import('./analyst/task')),
+  ...(await import('./analyst/tools')),
+  ...(await import('./analyst/deps')),
+});
 
 type Context = { params: Promise<{ chatId?: string }> };
 type Turn = { userId: string; controller: AbortController; interaction: Interaction };
@@ -28,7 +39,7 @@ async function owned(request: Request, context: Context) {
   if (!chatId || !/^[0-9a-f-]{36}$/i.test(chatId)) return { response: missing() };
   const chat = await store.get(userId, chatId);
   if (!chat) return { response: missing() };
-  return { userId, chatId, chat, body: parsed.body };
+  return { userId, chatId, chat, body: parsed.body, auth: parsed.auth };
 }
 
 export async function listChats(request: Request, _context: Context): Promise<Response> {
@@ -67,8 +78,13 @@ export async function deleteChat(request: Request, context: Context): Promise<Re
   // Wait for cancellation persistence before deleting by rejecting deletion while active.
   if (running.has(result.chatId))
     return json({ error: 'Cancel the active turn before deleting this chat' }, 409);
+  // Collect task ids first: the cascade removes the rows, artifacts must still be purged.
+  const lifecycle = isAnalystEnabled() ? await analystModules() : null;
+  const taskIds = lifecycle ? await lifecycle.listChatTaskIds(result.userId, result.chatId) : [];
   await store.delete(result.userId, result.chatId);
   clearResults(result.userId, result.chatId);
+  const verifier = lifecycle && taskIds.length ? lifecycle.analystDeps().verifier : null;
+  for (const taskId of taskIds) verifier?.cleanup({ userId: result.userId, taskId });
   return json({ ok: true });
 }
 export async function reply(request: Request, context: Context): Promise<Response> {
@@ -89,7 +105,7 @@ export async function cancel(request: Request, context: Context): Promise<Respon
 export async function runTurn(request: Request, context: Context): Promise<Response> {
   const result = await owned(request, context);
   if (result.response) return result.response;
-  const { userId, chatId, chat, body } = result;
+  const { userId, chatId, chat, body, auth } = result;
   if (
     typeof body?.message !== 'string' ||
     !body.message.trim() ||
@@ -133,7 +149,63 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
       }
     }
   };
-  const interaction = new Interaction(part => emit({ type: 'part', part }), controller.signal);
+  // Trusted server decision; the request cannot opt in, select a task or a principal.
+  const analyst = isAnalystEnabled();
+  const lifecycle = analyst ? await analystModules() : null;
+  let scope: TaskScope | undefined;
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let activeUntil = 0;
+  let deadlineHit = false;
+  const arm = (ms: number) => {
+    clearTimeout(deadline);
+    activeUntil = Date.now() + ms;
+    deadline = setTimeout(
+      () => {
+        deadlineHit = true;
+        if (scope && lifecycle) void lifecycle.block(scope, 'deadline').catch(() => undefined);
+        controller.abort();
+      },
+      Math.max(0, ms),
+    );
+  };
+  let remainingAtPause = 0;
+  const hooks = analyst
+    ? {
+        async pause() {
+          // Only validated pending confirm/question parts reach here; the wait does not count.
+          remainingAtPause = activeUntil - Date.now();
+          clearTimeout(deadline);
+          if (scope && lifecycle) await lifecycle.pause(scope);
+        },
+        async resume() {
+          if (scope && lifecycle) await lifecycle.resume(scope);
+          if (!controller.signal.aborted) arm(remainingAtPause);
+        },
+      }
+    : undefined;
+  if (lifecycle) {
+    try {
+      const task = await lifecycle.ensureTask(userId, chatId, body.message.trim(), body.context);
+      if (task.status === 'blocked')
+        return json({ error: 'Task is blocked', status: 'blocked', taskId: task.id }, 409);
+      scope = { userId, chatId, taskId: task.id };
+      remainingAtPause = lifecycle.remainingMs(task);
+      if (remainingAtPause <= 0) {
+        await lifecycle.block(scope, 'deadline');
+        return json({ error: 'Task execution window exhausted', status: 'blocked' }, 409);
+      }
+    } catch {
+      return json({ error: 'Unable to start analyst task' }, 500);
+    }
+  }
+  const interaction = new Interaction(
+    part => emit({ type: 'part', part }),
+    controller.signal,
+    300000,
+    hooks,
+  );
+  const deps = lifecycle?.analystDeps();
+  const queryState = { queries: 0 };
   running.set(chatId, { userId, controller, interaction });
   const disconnect = () => {
     disconnected = true;
@@ -169,7 +241,9 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
       void (async () => {
         let failure: string | undefined;
         let session: string | null | undefined;
-        const timeout = setTimeout(() => controller.abort(), 300000);
+        // Legacy: fixed 5-minute wall clock. Analyst: 5 minutes of non-waiting execution.
+        const timeout = analyst ? undefined : setTimeout(() => controller.abort(), 300000);
+        if (analyst) arm(remainingAtPause);
         try {
           if (!chat.messages.some(message => message.role === 'user')) {
             const title = userMessage.text.slice(0, 60);
@@ -183,8 +257,36 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
               session: chat.piSession,
               signal: controller.signal,
               emit,
-              tool: (name, args) =>
-                executeTool(name, args, { credentials, interaction, context: toolContext }),
+              analyst,
+              tool: async (name, args) => {
+                if (
+                  scope &&
+                  deps &&
+                  lifecycle &&
+                  (lifecycle.ANALYST_TOOLS as readonly string[]).includes(name)
+                ) {
+                  const outcome = await lifecycle.executeAnalystTool(
+                    name as AnalystToolName,
+                    args,
+                    {
+                      auth,
+                      scope,
+                      interaction,
+                      deps,
+                      running: queryState,
+                    },
+                  );
+                  return outcome.images?.length
+                    ? new ImageToolResult(outcome.json, outcome.images)
+                    : outcome.json;
+                }
+                return executeTool(name, args, {
+                  credentials,
+                  interaction,
+                  context: toolContext,
+                  analyst,
+                });
+              },
             });
             failure = outcome.error;
             session = outcome.session;
@@ -194,6 +296,10 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
         } finally {
           finishTurn(toolContext);
           clearTimeout(timeout);
+          clearTimeout(deadline);
+          // A deadline stays resumable (blocked); only a user/client cancel cancels the task.
+          if (scope && lifecycle && failure === 'Cancelled' && !deadlineHit)
+            await lifecycle.cancelTask(scope).catch(() => undefined);
           // Resolve any outstanding interactions and stop running tools on every terminal path.
           const cancelled = controller.signal.aborted || failure === 'Cancelled';
           controller.abort();
@@ -210,7 +316,8 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
             id: messageId,
             role: 'assistant',
             createdAt,
-            parts,
+            // Image blocks/markers never reach the chat table, even via a tool result.
+            parts: sanitize(parts),
             status: cancelled ? 'cancelled' : failure ? 'error' : 'done',
             ...(failure && !cancelled ? { error: failure } : {}),
           };

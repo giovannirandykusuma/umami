@@ -11,7 +11,54 @@ export const names = [
   'query_breakdown',
   'query_totals',
 ];
+export const analystNames = [
+  'analyst_discover',
+  'analyst_preview',
+  'analyst_plan_board',
+  'analyst_commit_draft',
+  'analyst_readback',
+  'analyst_verify_render',
+  'analyst_record_inspection',
+  'analyst_request_change',
+];
+const IMAGE_MIMES = ['image/png', 'image/jpeg'];
+// Decoded 1 MiB per image, at most 6 images, base64-only data (spec §4.2).
+const MAX_IMAGE_BASE64 = Math.ceil((1024 * 1024) / 3) * 4;
+
+/** Converts the host's dedicated image envelope into Pi content blocks; base64 never goes to text. */
+export function imageContent(name, value) {
+  let envelope;
+  try {
+    envelope = JSON.parse(value);
+  } catch {
+    return null;
+  }
+  if (!envelope || envelope.umamiImageEnvelope !== 1) return null;
+  if (
+    name !== 'analyst_verify_render' ||
+    typeof envelope.text !== 'string' ||
+    !Array.isArray(envelope.images) ||
+    envelope.images.length > 6 ||
+    envelope.images.some(
+      i =>
+        !i ||
+        !IMAGE_MIMES.includes(i.mimeType) ||
+        typeof i.data !== 'string' ||
+        !i.data ||
+        i.data.length > MAX_IMAGE_BASE64 ||
+        !/^[A-Za-z0-9+/]*={0,2}$/.test(i.data),
+    )
+  )
+    throw new Error('Invalid host image result');
+  return [
+    { type: 'text', text: envelope.text },
+    ...envelope.images.map(i => ({ type: 'image', data: i.data, mimeType: i.mimeType })),
+  ];
+}
+
 export default function (pi) {
+  const analyst = process.env.AI_ANALYST_ENABLED === 'true';
+  const active = analyst ? [...names, ...analystNames] : names;
   const string = () => Type.String({ maxLength: 4000 });
   const optional = schema => Type.Optional(schema);
   const enumeration = values => Type.Union(values.map(Type.Literal));
@@ -186,11 +233,90 @@ export default function (pi) {
     ]),
     open_link: Type.Object({ label: string(), href: string() }),
   };
-  for (const name of names) {
+  // Host re-validates every field strictly; these schemas only keep calls well-formed. No
+  // taskId, principal, URL, capability or credential field exists in any analyst schema.
+  const uuid = Type.String({ format: 'uuid' });
+  const bundle = {
+    boardId: optional(uuid),
+    expectedRevision: optional(Type.Integer({ minimum: 1 })),
+    board: strict({
+      type: Type.Literal('mixed'),
+      name: string(),
+      description: optional(string()),
+      parameters: Type.Object({}),
+    }),
+    analyses: Type.Array(
+      strict({
+        ref: string(),
+        name: string(),
+        description: optional(string()),
+        definition: Type.Object({}),
+      }),
+      { maxItems: 12 },
+    ),
+  };
+  const repair = strict({ widgetId: string(), reason: string() });
+  Object.assign(parameters, {
+    analyst_discover: strict({ websiteId: optional(uuid) }),
+    analyst_preview: strict({ definition: Type.Object({}) }),
+    analyst_plan_board: strict(bundle),
+    analyst_commit_draft: strict({ ...bundle, operationKey: string(), repair: optional(repair) }),
+    analyst_readback: strict({ boardId: uuid }),
+    analyst_verify_render: strict({ boardId: uuid, rerender: optional(Type.Boolean()) }),
+    analyst_record_inspection: strict({
+      receiptId: uuid,
+      observations: Type.Array(
+        strict({
+          widgetId: string(),
+          hash: Type.String({ pattern: '^[0-9a-f]{64}$' }),
+          issue: enumeration([
+            'none',
+            'label',
+            'chart_type',
+            'axes',
+            'date_timezone',
+            'units',
+            'missing',
+            'error',
+            'clipping',
+            'narrow_layout',
+          ]),
+          note: string(),
+        }),
+        { minItems: 1, maxItems: 72 },
+      ),
+    }),
+    analyst_request_change: strict({
+      ...bundle,
+      boardId: uuid,
+      expectedRevision: Type.Integer({ minimum: 1 }),
+    }),
+  });
+  const descriptions = {
+    analyst_discover:
+      'List authorized websites, date coverage, metric capabilities, saved analyses and boards. No bulk property-value enumeration.',
+    analyst_preview:
+      'Validate and execute an unsaved analysis definition read-only; returns provenance and completeness.',
+    analyst_plan_board:
+      'Validate a proposed board bundle without mutation; returns the diff and whether confirmation is required.',
+    analyst_commit_draft:
+      "Idempotently create or revise this task's own private draft board. Changing a committed definition requires repair provenance and may not change its meaning.",
+    analyst_readback:
+      'Read stored board/analysis revisions and execute saved queries to compare with intent.',
+    analyst_verify_render:
+      'Request an isolated render of a board revision; returns a receipt and bounded screenshots when available.',
+    analyst_record_inspection:
+      'Record screenshot observations keyed to receipt, screenshot hash and widget ID.',
+    analyst_request_change:
+      'Propose an exact change to an existing board; the user must confirm before anything is applied.',
+  };
+  for (const name of active) {
     pi.registerTool({
       name,
       label: name,
-      description: `Umami assistant ${name}. Host validates authorization and waits for the user's confirmation of destructive operations.`,
+      description:
+        descriptions[name] ??
+        `Umami assistant ${name}. Host validates authorization and waits for the user's confirmation of destructive operations.`,
       parameters: parameters[name],
       async execute(_id, args, signal, _update, ctx) {
         if (signal?.aborted) throw new Error('Cancelled');
@@ -198,6 +324,8 @@ export default function (pi) {
         if (Buffer.byteLength(payload) > 32768) throw new Error('Arguments too large');
         const value = await ctx.ui.input('umami-assistant-tool', payload);
         if (value === undefined) throw new Error('Host denied tool');
+        const images = imageContent(name, value);
+        if (images) return { content: images, details: {}, isError: false };
         let isError = false;
         try {
           isError = JSON.parse(value)?.ok === false;
@@ -209,8 +337,8 @@ export default function (pi) {
     });
   }
   pi.on('session_start', (_event, ctx) => {
-    pi.setActiveTools(names);
-    if (JSON.stringify(pi.getActiveTools().sort()) !== JSON.stringify([...names].sort()))
+    pi.setActiveTools(active);
+    if (JSON.stringify(pi.getActiveTools().sort()) !== JSON.stringify([...active].sort()))
       process.exit(1);
     let origin;
     try {
@@ -227,6 +355,6 @@ export default function (pi) {
       process.exit(1);
   });
   pi.on('tool_call', event => {
-    if (!names.includes(event.toolName)) return { block: true, reason: 'Tool denied' };
+    if (!active.includes(event.toolName)) return { block: true, reason: 'Tool denied' };
   });
 }

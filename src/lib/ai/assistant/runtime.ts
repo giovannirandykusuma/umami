@@ -6,6 +6,9 @@ import { StringDecoder } from 'node:string_decoder';
 import { gatewayConfig, permissionArgs, reasoningLevel } from '../rpc/confinement.mjs';
 import { assistantPrompt } from './prompt';
 import { boundedSession } from './store';
+import { ANALYST_TOOLS } from './analyst/tools';
+import { sanitize, sanitizeSession } from './analyst/sanitize';
+import { isAnalystEnabled } from '@/lib/analyst/flags';
 import type { AssistantPart, AssistantStreamEvent, AssistantTurnContext } from './protocol';
 import { truncate } from './tools';
 
@@ -15,12 +18,40 @@ export interface RuntimeInput {
   context?: AssistantTurnContext;
   signal: AbortSignal;
   emit: (event: AssistantStreamEvent) => void;
-  tool: (name: string, args: unknown) => Promise<string>;
+  tool: (name: string, args: unknown) => Promise<unknown>;
+  /** Trusted host decision (feature flag), never derived from request fields. */
+  analyst?: boolean;
+}
+export const BASE_TOOLS = [
+  'umami_api',
+  'ask_user',
+  'show_chart',
+  'open_link',
+  'analytics_schema',
+  'find_people',
+  'query_series',
+  'query_breakdown',
+  'query_totals',
+];
+/** Encoded transport budget for each image-bearing verification response (spec §4.2). */
+export const IMAGE_TRANSPORT_BYTES = 32 * 1024 * 1024;
+const OUTPUT_BYTES = 8 * 1024 * 1024;
+/**
+ * Host-created image result. Only validated verifier images reach this class; the runtime sends
+ * them on a dedicated envelope that the extension converts into Pi image blocks.
+ */
+export class ImageToolResult {
+  constructor(
+    readonly json: unknown,
+    readonly images: { mime: string; data: string; hash: string }[],
+  ) {}
 }
 export interface RuntimeOptions {
   env: Record<string, string>;
   bridge: string;
   timeoutMs?: number;
+  /** Allowed tool names; defaults to the legacy assistant set. */
+  tools?: string[];
 }
 export function runAssistant(input: RuntimeInput) {
   if (process.env.AI_ENABLED !== 'true') throw new Error('AI is disabled');
@@ -37,9 +68,21 @@ export function runAssistant(input: RuntimeInput) {
     env[key] = process.env[key]!;
   }
   env.AI_REASONING_LEVEL = reasoningLevel(process.env);
+  const analyst = !!input.analyst && isAnalystEnabled();
+  if (analyst) env.AI_ANALYST_ENABLED = 'true';
   if (!isAbsolute(env.AI_PI_ROOT)) throw new Error('AI installation must be absolute');
   gatewayConfig(env);
-  return runAssistantProcess(input, { env, bridge: resolve('scripts/ai/native.mjs') });
+  return runAssistantProcess(input, {
+    env,
+    bridge: resolve('scripts/ai/native.mjs'),
+    ...(analyst
+      ? {
+          tools: [...BASE_TOOLS, ...ANALYST_TOOLS],
+          // User-wait time is excluded from the task window; the handler owns that deadline.
+          timeoutMs: 24 * 60 * 60_000,
+        }
+      : {}),
+  });
 }
 
 /** Injection seam for offline child-process tests; not selectable through a request. */
@@ -52,7 +95,8 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
     const sessions = join(directory, 'sessions');
     await mkdir(agent);
     await mkdir(sessions);
-    const restored = boundedSession(input.session);
+    const allowed = options.tools ?? BASE_TOOLS;
+    const restored = boundedSession(sanitizeSession(input.session));
     const sessionPath = join(sessions, 'restored.jsonl');
     if (restored) {
       // Pi validates the header cwd before loading a session. Each turn has a new
@@ -62,7 +106,8 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
       if (header.type !== 'session') throw new Error('Invalid assistant session header');
       await writeFile(
         sessionPath,
-        JSON.stringify({ ...header, cwd: directory }) + (newline < 0 ? '\n' : restored.slice(newline)),
+        JSON.stringify({ ...header, cwd: directory }) +
+          (newline < 0 ? '\n' : restored.slice(newline)),
         { mode: 0o600 },
       );
     }
@@ -105,7 +150,10 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
       '--thinking',
       reasoningLevel(options.env),
       '--system-prompt',
-      assistantPrompt(input.context),
+      assistantPrompt(
+        input.context,
+        allowed.some(name => name.startsWith('analyst_')),
+      ),
     ];
     const child = spawn(process.execPath, args, {
       cwd: directory,
@@ -139,6 +187,8 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
         let tools = 0;
         let bridges = 0;
         let bytes = 0;
+        let imageBytes = 0;
+        let imageAllowance = 0;
         let stderrBytes = 0;
         let diagnostics = '';
         let buffer = '';
@@ -221,17 +271,7 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
               ++tools > 40 ||
               typeof value.toolCallId !== 'string' ||
               toolParts.has(value.toolCallId) ||
-              ![
-                'umami_api',
-                'ask_user',
-                'show_chart',
-                'open_link',
-                'analytics_schema',
-                'find_people',
-                'query_series',
-                'query_breakdown',
-                'query_totals',
-              ].includes(value.toolName)
+              !allowed.includes(value.toolName)
             )
               throw new Error('Assistant tool limit or name denied');
             const part: Extract<AssistantPart, { type: 'tool' }> = {
@@ -246,7 +286,7 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
                       show_chart: 'Show chart',
                       open_link: 'Open link',
                     }[value.toolName as string] || value.toolName,
-              args: value.args,
+              args: sanitize(value.args),
               status: 'running',
             };
             toolParts.set(part.id, part);
@@ -263,7 +303,8 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
                   : JSON.stringify(value.result).includes('User denied')
                     ? 'denied'
                     : 'done',
-                result: truncate(value.result, 8192),
+                // Redact image blocks before serialization, never after truncation.
+                result: truncate(sanitize(value.result), 8192),
                 durationMs: value.durationMs,
               },
             });
@@ -280,30 +321,36 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
               throw new Error('Invalid host tool request');
             seen.add(value.id);
             const request = JSON.parse(value.placeholder);
-            if (
-              ![
-                'umami_api',
-                'ask_user',
-                'show_chart',
-                'open_link',
-                'analytics_schema',
-                'find_people',
-                'query_series',
-                'query_breakdown',
-                'query_totals',
-              ].includes(request.name)
-            )
-              throw new Error('Invalid host tool name');
+            if (!allowed.includes(request.name)) throw new Error('Invalid host tool name');
             pending.add(value.id);
             Promise.resolve()
               .then(() => input.tool(request.name, request.args))
               .then(
-                result =>
-                  send({
-                    type: 'extension_ui_response',
-                    id: value.id,
-                    value: truncate(result, 32768),
-                  }),
+                result => {
+                  if (
+                    result instanceof ImageToolResult &&
+                    request.name === 'analyst_verify_render'
+                  ) {
+                    imageAllowance += IMAGE_TRANSPORT_BYTES;
+                    send({
+                      type: 'extension_ui_response',
+                      id: value.id,
+                      value: JSON.stringify({
+                        umamiImageEnvelope: 1,
+                        text: truncate(result.json, 32768),
+                        images: result.images.map(i => ({ mimeType: i.mime, data: i.data })),
+                      }),
+                    });
+                  } else
+                    send({
+                      type: 'extension_ui_response',
+                      id: value.id,
+                      value: truncate(
+                        result instanceof ImageToolResult ? result.json : result,
+                        32768,
+                      ),
+                    });
+                },
                 () =>
                   send({
                     type: 'extension_ui_response',
@@ -324,14 +371,26 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
         };
         child.stdout.on('data', (chunk: Buffer) => {
           if (finished) return;
-          bytes += chunk.length;
-          if (bytes > 8 * 1024 * 1024) return finish(new Error('Assistant output exceeded limit'));
           buffer += decoder.write(chunk);
+          // Meter complete records: image-bearing records (repeated encoded bytes included) use the
+          // separate per-attempt image budget; everything else keeps the 8 MiB stream ceiling.
+          if (buffer.length > OUTPUT_BYTES + imageAllowance)
+            return finish(new Error('Assistant output exceeded limit'));
           try {
             while (!finished && buffer.includes('\n')) {
               const newline = buffer.indexOf('\n');
               const line = buffer.slice(0, newline).replace(/\r$/, '');
               buffer = buffer.slice(newline + 1);
+              const size = Buffer.byteLength(line) + 1;
+              if (line.includes('"type":"image"')) {
+                imageBytes += size;
+                if (imageBytes > imageAllowance)
+                  return finish(new Error('Assistant image transport exceeded limit'));
+              } else {
+                bytes += size;
+                if (bytes > OUTPUT_BYTES)
+                  return finish(new Error('Assistant output exceeded limit'));
+              }
               if (line) record(JSON.parse(line));
             }
           } catch (error) {
@@ -355,9 +414,11 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
     const files = (await readdir(sessions)).filter(name => name.endsWith('.jsonl'));
     if (files.length)
       session = boundedSession(
-        await readFile(
-          join(sessions, files.includes('restored.jsonl') ? 'restored.jsonl' : files[0]),
-          'utf8',
+        sanitizeSession(
+          await readFile(
+            join(sessions, files.includes('restored.jsonl') ? 'restored.jsonl' : files[0]),
+            'utf8',
+          ),
         ),
       );
     return {
