@@ -5,6 +5,9 @@ import {
   type AssistantMessage,
   type AssistantPart,
   type AssistantStreamEvent,
+  type AnalystPhase,
+  type AnalystTaskStatus,
+  analystToolPhase,
 } from './protocol';
 import { store, summary } from './store';
 import { runAssistant } from './runtime';
@@ -153,6 +156,15 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
   const analyst = isAnalystEnabled();
   const lifecycle = analyst ? await analystModules() : null;
   let scope: TaskScope | undefined;
+  // Host-derived task status/phase; only emitted when the analyst flag bound a persisted task.
+  let taskStatus: AnalystTaskStatus = 'running';
+  let phase: AnalystPhase = 'understand';
+  const emitTask = (status?: AnalystTaskStatus, next?: AnalystPhase) => {
+    if (!scope) return;
+    if (status) taskStatus = status;
+    if (next) phase = next;
+    emit({ type: 'task', taskId: scope.taskId, status: taskStatus, phase });
+  };
   let deadline: ReturnType<typeof setTimeout> | undefined;
   let activeUntil = 0;
   let deadlineHit = false;
@@ -162,7 +174,11 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
     deadline = setTimeout(
       () => {
         deadlineHit = true;
-        if (scope && lifecycle) void lifecycle.block(scope, 'deadline').catch(() => undefined);
+        if (scope && lifecycle)
+          void lifecycle
+            .block(scope, 'deadline')
+            .then(task => emitTask(task.status))
+            .catch(() => undefined);
         controller.abort();
       },
       Math.max(0, ms),
@@ -175,10 +191,10 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
           // Only validated pending confirm/question parts reach here; the wait does not count.
           remainingAtPause = activeUntil - Date.now();
           clearTimeout(deadline);
-          if (scope && lifecycle) await lifecycle.pause(scope);
+          if (scope && lifecycle) emitTask((await lifecycle.pause(scope)).status);
         },
         async resume() {
-          if (scope && lifecycle) await lifecycle.resume(scope);
+          if (scope && lifecycle) emitTask((await lifecycle.resume(scope)).status);
           if (!controller.signal.aborted) arm(remainingAtPause);
         },
       }
@@ -189,6 +205,7 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
       if (task.status === 'blocked')
         return json({ error: 'Task is blocked', status: 'blocked', taskId: task.id }, 409);
       scope = { userId, chatId, taskId: task.id };
+      taskStatus = task.status;
       remainingAtPause = lifecycle.remainingMs(task);
       if (remainingAtPause <= 0) {
         await lifecycle.block(scope, 'deadline');
@@ -238,6 +255,7 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
     start(streamController) {
       output = streamController;
       emit({ type: 'start', chatId, messageId });
+      emitTask();
       void (async () => {
         let failure: string | undefined;
         let session: string | null | undefined;
@@ -265,6 +283,7 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
                   lifecycle &&
                   (lifecycle.ANALYST_TOOLS as readonly string[]).includes(name)
                 ) {
+                  emitTask(undefined, analystToolPhase(name) ?? undefined);
                   const outcome = await lifecycle.executeAnalystTool(
                     name as AnalystToolName,
                     args,
@@ -276,6 +295,9 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
                       running: queryState,
                     },
                   );
+                  // The tool may have persisted a lifecycle change (e.g. budget block); re-read it.
+                  const persisted = await lifecycle.getTask(scope).catch(() => null);
+                  if (persisted) emitTask(persisted.status);
                   return outcome.images?.length
                     ? new ImageToolResult(outcome.json, outcome.images)
                     : outcome.json;
@@ -299,7 +321,10 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
           clearTimeout(deadline);
           // A deadline stays resumable (blocked); only a user/client cancel cancels the task.
           if (scope && lifecycle && failure === 'Cancelled' && !deadlineHit)
-            await lifecycle.cancelTask(scope).catch(() => undefined);
+            await lifecycle
+              .cancelTask(scope)
+              .then(task => emitTask(task.status))
+              .catch(() => undefined);
           // Resolve any outstanding interactions and stop running tools on every terminal path.
           const cancelled = controller.signal.aborted || failure === 'Cancelled';
           controller.abort();

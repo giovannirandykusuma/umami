@@ -33,6 +33,7 @@ export async function renderJob({
   artifacts,
   signal,
   timeoutMs = 30_000,
+  transport,
 }) {
   if (timeoutMs > 30_000 || timeoutMs <= 0) throw new Error('invalid_timeout');
   if (!Array.isArray(expectedWidgets) || !expectedWidgets.length)
@@ -62,16 +63,32 @@ export async function renderJob({
       route.request().method() === 'GET' &&
       !route.request().redirectedFrom() &&
       route.request().url() !== `${origin}/exchange`
-        ? route.continue()
+        ? transport
+          ? transport({ method: 'GET', path: new URL(route.request().url()).pathname }).then(
+              r => route.fulfill({ status: r.status, headers: r.headers, body: r.body }),
+              () => route.abort(),
+            )
+          : route.continue()
         : route.abort(),
     );
-    // Exchange is server-to-server, redirect disabled, not a capability-bearing URL.
-    const response = await context.request.post(`${origin}/exchange`, {
-      data: { capability },
-      maxRedirects: 0,
-      timeout: timeoutMs,
-    });
-    if (response.status() !== 204) throw new Error('exchange_denied');
+    // Exchange is server-to-server, redirect disabled, not a capability-bearing URL. With a
+    // private transport (network-less container) it goes over that channel, never a socket.
+    const status = transport
+      ? (
+          await transport({
+            method: 'POST',
+            path: '/exchange',
+            body: JSON.stringify({ capability }),
+          })
+        ).status
+      : (
+          await context.request.post(`${origin}/exchange`, {
+            data: { capability },
+            maxRedirects: 0,
+            timeout: timeoutMs,
+          })
+        ).status();
+    if (status !== 204) throw new Error('exchange_denied');
     const page = await context.newPage();
     page.on('popup', popup => {
       void popup.close();

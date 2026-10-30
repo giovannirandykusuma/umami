@@ -14,6 +14,7 @@ import {
 import { Legend } from '@/components/metrics/Legend';
 import { getChartBucketIndex } from '@/lib/charts';
 import { DEFAULT_ANIMATION_DURATION } from '@/lib/constants';
+import { type RenderReceipt, receiptAttributes } from './renderReceipt';
 
 ChartJS.defaults.font.family = 'Inter';
 
@@ -30,6 +31,8 @@ export interface ChartProps extends BoxProps {
   annotations?: ChartAnnotation[];
   onAnnotationClick?: (annotations: ChartAnnotation[]) => void;
   onAnnotationMoreClick?: (annotations: ChartAnnotation[]) => void;
+  /** Query-backed render receipt (state/execution/hash from the query, not canvas presence). */
+  receipt?: RenderReceipt;
 }
 
 function isSameMarkers(a: AnnotationMarker[], b: AnnotationMarker[]) {
@@ -58,6 +61,7 @@ export function Chart({
   annotations,
   onAnnotationClick,
   onAnnotationMoreClick,
+  receipt,
   ...props
 }: ChartProps) {
   const canvas = useRef(null);
@@ -224,7 +228,7 @@ export function Chart({
 
   return (
     <Column gap="6">
-      <Box {...props}>
+      <Box {...props} {...receiptAttributes(receipt)}>
         <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
           <canvas ref={canvas} style={{ position: 'absolute', top: 0, left: 0 }} />
           {markers.length > 0 && (

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -52,8 +53,65 @@ export interface RuntimeOptions {
   timeoutMs?: number;
   /** Allowed tool names; defaults to the legacy assistant set. */
   tools?: string[];
+  /** Trusted, verified synthetic fixture provider extension (offlineFixtureRuntime only). */
+  offlineProvider?: string;
 }
+/** The only database the offline fixture may run against (synthetic engine, owned schema). */
+export const OFFLINE_FIXTURE_DATABASE =
+  'postgresql://ai_synthetic@127.0.0.1:25432/ai_synthetic?schema=analyst_fixture';
+const OFFLINE_FIXTURE_MODE = 'analyst-synthetic-v1';
+const LIVE_KEYS = ['AI_PROVIDER', 'AI_MODEL', 'AI_BASE_URL', 'AI_PROVIDER_KEY', 'AI_EGRESS_ORIGINS'];
+
+/**
+ * Synthetic-only deterministic runtime selector. Server env only (never request/model input).
+ * Returns null when not requested; throws (fail closed, never a live fallback) when requested
+ * outside a positively verified fixture context: non-production, the exact synthetic database,
+ * the launcher-written receipt matching its nonce, and no live provider configuration at all.
+ */
+export function offlineFixtureRuntime(env: Record<string, string | undefined>, cwd: string) {
+  if (env.AI_OFFLINE_FIXTURE === undefined) return null;
+  const fail = () => {
+    throw new Error('Offline fixture runtime refused outside the verified synthetic fixture');
+  };
+  if (env.AI_OFFLINE_FIXTURE !== OFFLINE_FIXTURE_MODE) fail();
+  if (env.NODE_ENV === 'production' || env.DATABASE_URL !== OFFLINE_FIXTURE_DATABASE) fail();
+  if (LIVE_KEYS.some(key => env[key] !== undefined)) fail();
+  const nonce = env.AI_OFFLINE_FIXTURE_NONCE;
+  if (!nonce || !/^[0-9a-f]{64}$/.test(nonce)) fail();
+  let receipt: any;
+  try {
+    receipt = JSON.parse(readFileSync(join(cwd, '.analyst-fixture-receipt.json'), 'utf8'));
+  } catch {
+    fail();
+  }
+  if (receipt?.mode !== OFFLINE_FIXTURE_MODE || receipt?.nonce !== nonce) fail();
+  const provider = resolve(cwd, 'scripts/ai/analyst-fixture/offline-provider.mjs');
+  return {
+    provider,
+    env: {
+      AI_PROVIDER: 'umami-offline-fixture',
+      AI_MODEL: 'analyst-script-v1',
+      AI_BASE_URL: 'https://offline-fixture.invalid',
+      AI_EGRESS_ORIGINS: 'https://offline-fixture.invalid',
+      AI_PROVIDER_KEY: 'offline-fixture-no-credential',
+    },
+  };
+}
+
 export function runAssistant(input: RuntimeInput) {
+  const offline = offlineFixtureRuntime(process.env, process.cwd());
+  if (offline) {
+    if (!input.analyst || !isAnalystEnabled()) throw new Error('Offline fixture is analyst-only');
+    const root = process.env.AI_PI_ROOT;
+    if (!root || !isAbsolute(root)) throw new Error('AI installation must be absolute');
+    return runAssistantProcess(input, {
+      env: { ...offline.env, AI_PI_ROOT: root, AI_REASONING_LEVEL: 'off', AI_ANALYST_ENABLED: 'true' },
+      bridge: resolve('scripts/ai/native.mjs'),
+      offlineProvider: offline.provider,
+      tools: [...BASE_TOOLS, ...ANALYST_TOOLS],
+      timeoutMs: 24 * 60 * 60_000,
+    });
+  }
   if (process.env.AI_ENABLED !== 'true') throw new Error('AI is disabled');
   const env: Record<string, string> = {};
   for (const key of [
@@ -114,9 +172,12 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
     const native = options.bridge === resolve('scripts/ai/native.mjs');
     const extension = resolve('scripts/ai/assistant-tools.mjs');
     if (native)
-      await writeFile(join(agent, 'models.json'), JSON.stringify(gatewayConfig(options.env)), {
-        mode: 0o600,
-      });
+      await writeFile(
+        join(agent, 'models.json'),
+        // Offline: no gateway provider exists at all, so nothing can reach a network endpoint.
+        JSON.stringify(options.offlineProvider ? { providers: {} } : gatewayConfig(options.env)),
+        { mode: 0o600 },
+      );
     const args = [
       ...(native
         ? permissionArgs({
@@ -125,6 +186,9 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
             bridge: options.bridge,
             extension,
           })
+        : []),
+      ...(native && options.offlineProvider
+        ? [`--allow-fs-read=${resolve(options.offlineProvider)}`]
         : []),
       options.bridge,
       '--mode',
@@ -143,6 +207,7 @@ export async function runAssistantProcess(input: RuntimeInput, options: RuntimeO
       '--no-builtin-tools',
       '--extension',
       extension,
+      ...(options.offlineProvider ? ['--extension', options.offlineProvider] : []),
       '--provider',
       options.env.AI_PROVIDER,
       '--model',

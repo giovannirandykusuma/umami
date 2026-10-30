@@ -35,6 +35,7 @@ export function createDispatcher({
   isolated = false,
   origin,
   launch,
+  serve,
 }) {
   const queue = createQueue();
   return {
@@ -51,6 +52,7 @@ export function createDispatcher({
             let imageTransportBytes = 0;
             let jsonTransportBytes = 0;
             let artifact;
+            let session;
             const stop = error => {
               if (terminal) return;
               terminal = true;
@@ -77,7 +79,26 @@ export function createDispatcher({
                 else jsonTransportBytes += Buffer.byteLength(JSON.stringify(message));
                 if (imageTransportBytes > 32 * 1024 * 1024 || jsonTransportBytes > 8 * 1024 * 1024)
                   throw new Error('transport_budget');
-                if (message.type === 'authorize') {
+                if (message.type === 'http') {
+                  // Private-channel canvas request from a network-less worker. The session is
+                  // bound to this job on the host and never handed to the child.
+                  if (typeof serve !== 'function') throw new Error('no_transport');
+                  const response = await serve({
+                    method: message.method,
+                    path: message.path,
+                    body: message.body,
+                    cookie: session ? `verifier=${session}` : '',
+                  });
+                  if (response.session) session = response.session;
+                  if (!terminal)
+                    child.send({
+                      type: 'http',
+                      id: message.id,
+                      status: response.status,
+                      headers: response.headers,
+                      body: response.body,
+                    });
+                } else if (message.type === 'authorize') {
                   const allowed = await authorize(scope);
                   if (!terminal) child.send({ type: 'authority', id: message.id, allowed });
                 } else if (message.type === 'result') {

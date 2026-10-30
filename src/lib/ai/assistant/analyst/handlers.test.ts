@@ -193,3 +193,46 @@ it('a later independent turn after cancellation starts a fresh task', async () =
   expect(mocks.db.tasks[1].budgets.consumed.toolCalls).toBe(1);
   expect(mocks.run).toHaveBeenCalledTimes(1);
 });
+
+const taskEvents = (sse: string) =>
+  sse
+    .split('\n\n')
+    .filter(frame => frame.startsWith('event: task'))
+    .map(frame => JSON.parse(frame.split('data: ')[1]));
+
+it('flag on: SSE task events carry the host task id, persisted status and tool-derived phase', async () => {
+  mocks.run.mockImplementation(async (input: any) => {
+    // Model-emitted forgery cannot be distinguished by the client: the host owns the event type.
+    await input.tool('analyst_discover', {});
+    return { session: null };
+  });
+  const events = taskEvents(await drain(await runTurn(request(), context)));
+  const taskId = mocks.db.tasks[0].id;
+  expect(events[0]).toEqual({ type: 'task', taskId, status: 'running', phase: 'understand' });
+  expect(events[1]).toEqual({ type: 'task', taskId, status: 'running', phase: 'discover' });
+  expect(events.every((e: any) => e.taskId === taskId)).toBe(true);
+});
+
+it('flag on: a tool that exhausts the budget emits the persisted blocked status after it', async () => {
+  mocks.run.mockImplementation(async (input: any) => {
+    for (let i = 0; i <= 40; i++) await input.tool('analyst_discover', {});
+    return { session: null };
+  });
+  const events = taskEvents(await drain(await runTurn(request(), context)));
+  expect(mocks.db.tasks[0].status).toBe('blocked');
+  expect(events.at(-1)).toMatchObject({ status: 'blocked', taskId: mocks.db.tasks[0].id });
+});
+
+it('flag on: cancellation emits the persisted cancelled status', async () => {
+  mocks.run.mockResolvedValue({ error: 'Cancelled', session: null });
+  const events = taskEvents(await drain(await runTurn(request(), context)));
+  expect(events.at(-1)).toMatchObject({ status: 'cancelled', taskId: mocks.db.tasks[0].id });
+});
+
+it('flag off (legacy): no task events are emitted', async () => {
+  delete process.env.AI_ANALYST_ENABLED;
+  mocks.run.mockResolvedValue({ session: null });
+  const sse = await drain(await runTurn(request(), context));
+  expect(taskEvents(sse)).toHaveLength(0);
+  expect(sse).toContain('event: done');
+});

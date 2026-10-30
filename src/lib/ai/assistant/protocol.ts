@@ -135,6 +135,45 @@ export interface AssistantToolError {
   retryable: boolean;
 }
 
+/** Analyst phases (spec): statuses only, never fabricated reasoning. Host-derived, flag-gated. */
+export type AnalystPhase =
+  | 'understand'
+  | 'discover'
+  | 'query'
+  | 'preview'
+  | 'save_draft'
+  | 'readback'
+  | 'execute_saved'
+  | 'render'
+  | 'inspect'
+  | 'repair'
+  | 'complete';
+export type AnalystTaskStatus =
+  | 'running'
+  | 'awaiting_user'
+  | 'blocked'
+  | 'complete'
+  | 'cancelled'
+  | 'expired';
+
+/** Phase for a host-dispatched analyst tool; null for anything else (model text never sets it). */
+export function analystToolPhase(name: string): AnalystPhase | null {
+  return (
+    (
+      {
+        analyst_discover: 'discover',
+        analyst_preview: 'preview',
+        analyst_plan_board: 'preview',
+        analyst_commit_draft: 'save_draft',
+        analyst_readback: 'readback',
+        analyst_verify_render: 'render',
+        analyst_record_inspection: 'inspect',
+        analyst_request_change: 'repair',
+      } as Record<string, AnalystPhase>
+    )[name] ?? null
+  );
+}
+
 /**
  * SSE frames: `event: <type>\ndata: <json>\n\n`. Deltas append to the part with the same id;
  * `part` inserts or replaces a whole part by id. Exactly one terminal event (done | error).
@@ -145,6 +184,7 @@ export type AssistantStreamEvent =
   | { type: 'thinking_delta'; partId: string; delta: string }
   | { type: 'part'; part: AssistantPart }
   | { type: 'title'; chatId: string; title: string }
+  | { type: 'task'; taskId: string; status: AnalystTaskStatus; phase: AnalystPhase }
   | { type: 'done'; message: AssistantMessage }
   | { type: 'error'; error: string; message?: AssistantMessage };
 
@@ -158,6 +198,7 @@ export const ASSISTANT_STREAM_EVENTS = [
   'thinking_delta',
   'part',
   'title',
+  'task',
   'done',
   'error',
 ] as const;

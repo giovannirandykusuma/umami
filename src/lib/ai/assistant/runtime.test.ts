@@ -3,9 +3,15 @@ import { existsSync, globSync, mkdtempSync, readFileSync, writeFileSync, rmSync 
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/prisma', () => ({ default: {} }));
-import { runAssistantProcess } from './runtime';
+import { ANALYST_TOOLS } from './analyst/tools';
+import {
+  BASE_TOOLS,
+  OFFLINE_FIXTURE_DATABASE,
+  offlineFixtureRuntime,
+  runAssistantProcess,
+} from './runtime';
 
 const options = {
   env: { AI_PROVIDER: 'test', AI_MODEL: 'test', AI_REASONING_LEVEL: 'off' },
@@ -250,7 +256,10 @@ function isValidPng(png: Buffer) {
     if (type === 'IHDR') [width, height] = [body.readUInt32BE(4), body.readUInt32BE(8)];
     if (type === 'IDAT') idat.push(body.subarray(4));
     at += 12 + length;
-    if (type === 'IEND') return at === png.length && inflateSync(Buffer.concat(idat)).length === height * (1 + width * 3);
+    if (type === 'IEND')
+      return (
+        at === png.length && inflateSync(Buffer.concat(idat)).length === height * (1 + width * 3)
+      );
   }
   return false;
 }
@@ -386,4 +395,126 @@ it('does not bridge analyst tools for legacy (flag-off) turns', async () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Synthetic offline fixture runtime: real native Pi RPC + packaged deterministic provider.
+describe('offline fixture runtime selector', () => {
+  const nonce = 'ab'.repeat(32);
+  const fixtureEnv = {
+    AI_OFFLINE_FIXTURE: 'analyst-synthetic-v1',
+    AI_OFFLINE_FIXTURE_NONCE: nonce,
+    NODE_ENV: 'development',
+    DATABASE_URL: OFFLINE_FIXTURE_DATABASE,
+  };
+  const project = () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'offline-fixture-'));
+    writeFileSync(
+      resolve(dir, '.analyst-fixture-receipt.json'),
+      JSON.stringify({ mode: 'analyst-synthetic-v1', nonce }),
+    );
+    return dir;
+  };
+  it('is absent unless requested and accepts only the verified fixture context', () => {
+    expect(offlineFixtureRuntime({ AI_ENABLED: 'true' }, process.cwd())).toBeNull();
+    const dir = project();
+    try {
+      expect(offlineFixtureRuntime(fixtureEnv, dir)?.env.AI_PROVIDER).toBe('umami-offline-fixture');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it.each([
+    ['production', { NODE_ENV: 'production' }],
+    ['non-fixture database', { DATABASE_URL: 'postgresql://umami@db:5432/umami' }],
+    ['wrong mode', { AI_OFFLINE_FIXTURE: 'true' }],
+    ['missing nonce', { AI_OFFLINE_FIXTURE_NONCE: undefined }],
+    ['foreign nonce', { AI_OFFLINE_FIXTURE_NONCE: 'cd'.repeat(32) }],
+    ['live provider configured', { AI_PROVIDER: 'openai' }],
+    ['live provider key present', { AI_PROVIDER_KEY: 'sk-live' }],
+  ])('refuses (no live fallback): %s', (_name, change) => {
+    const dir = project();
+    try {
+      expect(() => offlineFixtureRuntime({ ...fixtureEnv, ...change }, dir)).toThrow(
+        'Offline fixture runtime refused',
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('refuses without the launcher receipt (e.g. a normal checkout)', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'offline-fixture-'));
+    try {
+      expect(() => offlineFixtureRuntime(fixtureEnv, dir)).toThrow(
+        'Offline fixture runtime refused',
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('the provider module has no network-capable import or call', () => {
+    const source = readFileSync('scripts/ai/analyst-fixture/offline-provider.mjs', 'utf8');
+    expect(source.match(/^import .*$/gm)).toEqual([
+      "import { createAssistantMessageEventStream } from '@earendil-works/pi-ai';",
+    ]);
+    expect(source).not.toMatch(/fetch\(|node:(https?|net|tls|dgram|child_process)|WebSocket/);
+  });
+  const piRoot = '/Users/randy/.local/lib/node_modules/@earendil-works/pi-coding-agent';
+  it.skipIf(!existsSync(piRoot))(
+    'drives a create/readback/repair/verify turn through native Pi RPC under --permission',
+    async () => {
+      const calls: string[] = [];
+      const events: any[] = [];
+      const board = '11111111-1111-4111-8111-111111111111';
+      const outcome = await runAssistantProcess(
+        {
+          message: 'Build a pageviews board',
+          session: null,
+          signal: new AbortController().signal,
+          emit: event => events.push(event),
+          analyst: true,
+          tool: async name => {
+            calls.push(name);
+            return JSON.stringify(
+              name === 'analyst_commit_draft'
+                ? { ok: true, board: { id: board, revision: calls.length } }
+                : name === 'analyst_verify_render'
+                  ? { ok: false, code: 'verifier_unavailable', visualStatus: 'visual_pending' }
+                  : { ok: true },
+            );
+          },
+        },
+        {
+          env: {
+            ...offlineFixtureRuntime(fixtureEnv, writeReceipt())!.env,
+            AI_PI_ROOT: piRoot,
+            AI_REASONING_LEVEL: 'off',
+            AI_ANALYST_ENABLED: 'true',
+          },
+          bridge: resolve('scripts/ai/native.mjs'),
+          offlineProvider: resolve('scripts/ai/analyst-fixture/offline-provider.mjs'),
+          tools: [...BASE_TOOLS, ...ANALYST_TOOLS],
+        },
+      );
+      expect(outcome.error).toBeUndefined();
+      expect(calls).toEqual([
+        'analyst_discover',
+        'analyst_commit_draft',
+        'analyst_readback',
+        'analyst_commit_draft',
+        'analyst_verify_render',
+      ]);
+      expect(
+        events
+          .filter(e => e.type === 'text_delta')
+          .map(e => e.delta)
+          .join(''),
+      ).toBe('Offline fixture turn complete; render status: visual_pending');
+      function writeReceipt() {
+        const dir = project();
+        afterAll(() => rmSync(dir, { recursive: true, force: true }));
+        return dir;
+      }
+    },
+    60_000,
+  );
 });

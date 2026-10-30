@@ -81,3 +81,66 @@ actual native/AnalysisWidget instrumentation are later integration gates. This
 slice does not modify or certify those paths. The renderer accepts PNG only; it
 validates framing/CRC, bounded decompression, dimensions and scanline filters before
 release. Unsupported formats fail closed.
+
+## Stage-4 integration (MAIN) — what exists and what B3 still needs
+
+- **Adapter:** `src/lib/analyst-verifier/port.mjs`. `analystDeps().verifier` is non-null only when
+  `AI_ANALYST_VERIFIER_ENABLED=true` AND trusted bootstrap called
+  `registerIsolatedLauncher({ launch, origin })` with the restricted-identity launcher. Nothing
+  registers one by default, so production stays `null` (fail closed, no host-browser fallback).
+  Authority (`verifierAuthority` in `analyst/deps.ts`) re-reads the task, user, board and analysis
+  rows on every capability/session/artifact use and requires an active task plus exact revisions.
+- **Fixture:** `sh scripts/ai/synthetic-engines/setup.sh && sh scripts/ai/analyst-fixture/setup.sh`
+  creates and migrates a schema-comment-receipted `analyst_fixture` schema on PG 25432 and seeds
+  admin/umami plus one synthetic website. It refuses other databases and unreceipted schemas.
+  `node scripts/ai/analyst-fixture/app.mjs` runs the app on 127.0.0.1:3327 with an explicit env
+  allowlist (`AI_ENABLED=false`, so no model calls, and no host secrets). Then
+  `node scripts/ai/analyst-fixture/smoke.mjs` performs a real login, analysis create and native execute.
+- **Widget receipt contract (UI worker, BoardViewColumn/AnalysisWidget, NOT yet wired):** each widget
+  root carries `data-analysis-widget=<board widget id>`, `data-analysis-state` ∈
+  `loading|rendered|empty|error|denied|unsupported` from `queryRenderState()` (query result only),
+  and `data-execution-id`/`data-definition-hash` only from the execute envelope
+  (`receiptAttributes()`; native charts get them via the `Chart` `receipt` prop). The verifier
+  canvas page must expose `window.__verifierReceipt = {boardId, boardRevision,
+  analysisRevisions, widgets:[{id,state,executionId,definitionHash}], complete}` built from those
+  attributes, inside one `[data-verifier-canvas]` root, after every widget has left `loading`.
+- **Pending (not passed):** the canvas route that serves the real board under the exchanged session
+  (`/exchange`, `/canvas`, `/receipt` on the internal origin), B3, and D2. Do not report them from
+  B2/fixture evidence.
+
+
+## Restricted launcher and offline fixture (integration round 2)
+
+- `src/lib/analyst-verifier/launcher.mjs` is the trusted launcher. For each job it starts one
+  `umami-analyst-verifier:local` container (`--network none`, uid 10001, `--cap-drop ALL`,
+  `--read-only`, `no-new-privileges`, no mounts, no env, tmpfs `/tmp`). The only channel is
+  stdio JSON lines. The capability exchange and the canvas/receipt GETs are answered by the host
+  (`canvas.mjs`) over that channel. No network proxy exists, and the browser aborts every other
+  request. `createVerifierPort` accepts only launchers built by `createDockerLauncher`; a
+  `{launch, origin}` callback object yields no port.
+- Bootstrap: with `AI_ANALYST_VERIFIER_ENABLED=true` AND `AI_ANALYST_VERIFIER_LAUNCHER=docker`,
+  `deps.ts` registers the docker launcher. Both are default-off and there is no host fallback.
+- Receipt binding: `prepareVerifierWidgets` re-executes each widget's saved analysis (widget ->
+  analysis from the stored board at the captured revision) with the task principal. The
+  receipt must match those exact `executionId`/`definitionHash` values, and stale or foreign
+  values are rejected.
+- PRE-B3: the canvas is a query-backed data table, NOT the real board/AnalysisWidget route.
+  Real-widget capture (B3) and visual acceptance (D2) stay pending until the UI checkpoint
+  is restored.
+- Build the image: `sh scripts/ai/verifier/build-image.sh`. Proof (real container, raw egress
+  probe): `node scripts/ai/verifier/docker-launcher-proof.mjs`.
+- Fixture placement: `app.mjs#systemTemp` ignores `$TMPDIR`. A lane may point it at a
+  repo-internal scratch dir whose ancestors hold `.pi`, and the native discovery guard
+  (unchanged) would refuse that. It uses the platform temp (macOS
+  `getconf DARWIN_USER_TEMP_DIR`, Linux `/tmp`). The temp must be a real directory owned by the
+  user (or root with the sticky bit), and no ancestor may contain `.pi`/`.agents/skills`. Each run
+  takes a unique `mkdtemp` 0700 directory holding the project, HOME and TMPDIR. Owned cleanup:
+  app.mjs removes exactly that directory on exit (also on an env-leak refusal). No global env or
+  shared files are modified.
+- Runnable smoke (any TMPDIR, e.g. a repo scratch dir):
+  `AI_PI_ROOT=/abs/pi sh scripts/ai/analyst-fixture/run-smoke.sh 3338`.
+- Offline fixture: `scripts/ai/analyst-fixture/app.mjs` boots Next from a sanitized temp
+  project (no `.env*`; env canary in `app.test.mjs`). The assistant uses the synthetic-only
+  `offline-provider.mjs` through native Pi RPC. `runtime.ts#offlineFixtureRuntime` refuses
+  unless the env is non-production, uses the exact synthetic DB URL, has no live provider keys,
+  and carries a nonce matching the launcher-written receipt.
