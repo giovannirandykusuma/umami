@@ -155,3 +155,11 @@ Worker completed host-authoritative task SSE seam, forked on size of remaining f
 ## [2026-10-30] analyst-integration-r2 | Authorize bounded offline runtime seam
 
 Worker fixed expired task authority and post-tool persisted SSEstatus; remaining offline fixture needs runtime selector outside original Owns. MAIN expanded runtime.ts/runtime.test.ts narrowly for positively verified synthetic-only offline provider with no live fallback, refusal tests outside fixture, normal native Pi confinement preserved. Docker networknone accepted only with actual bounded private IPC app/capability transport; otherwise prior two-peer internal network topology with real egress denial proof. A callback claiming isolated is insufficient. No production/newcredentials/paidcalls/push/deploy.
+
+## [2026-10-30] analyst-ui-resume | Authorize actual renderer integration
+
+Worker restored UI checkpoint and reports task UI plus query-backed widget attrs, but B3 still pre-B3 table. MAIN explicitly delegated narrow canvas.mjs real-production-renderer adapter plus fixture offline-provider request_change/confirmation scenarios and app flags-off mode. Strict capability/read-only session/execution-hash-revision binding remain mandatory; no cloned table/renderer or wildcard substitute. Any additional route/session wiring requires exact scope request. Fresh code+visual gates cover expanded changes; no push/deploy/paid/prod.
+
+## [2026-10-30] deployment exception | Explicit unreviewed analyst rollout authorization
+
+Randy directly chose Deploy and turn on for everyone in Ashiato MAIN01a1882b, relayed messagef2b7bd66-9a70-45bc-a767-1307c2b16ded. Authorized push/deploy and realmodel synthetic production testing despite Stage4 REJECTED on D2 and Stage5 NOTSTARTED. Snapshot45651773a explicitly UNREVIEWED, not a judge ACCEPT. This is a user-directed deployment exception, not normal reviewed merge. Retain freshDBbackup/previousimage despite prior backup deletion request, pre/post ingest200+storedrows gates. VPS app has no DockerCLI/socket and no verifierimage: verifierflag staysOFF per coordinator safeguard, no hostbrowser fallback or Docker socket shortcut. Analystflag plannedON only after build/migration/ingest verification. No completed D2/B3release or stage5 claims.
