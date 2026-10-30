@@ -8,6 +8,7 @@ vi.mock('@/lib/prisma', () => ({
 import {
   block,
   cancelTask,
+  completeTask,
   consume,
   ensureTask,
   getTask,
@@ -747,4 +748,19 @@ it('discover exposes the exact nested definition, widget and repair contracts', 
   );
   expect(data.contracts.definition.additionalProperties).toBe(false);
   expect(data.contracts.widget.component.type).toBe('AnalysisWidget');
+});
+
+it('completeTask closes only a plain running task; paused and blocked tasks keep their state', async () => {
+  for (const [setup, expected] of [
+    [async (s: any) => pause(s), 'awaiting_user'],
+    [async (s: any) => block(s, 'deadline'), 'blocked'],
+    [async () => undefined, 'complete'],
+  ] as const) {
+    db.current = createFakeDb();
+    db.current.chats.push({ id: CHAT, userId: USER });
+    const task = await ensureTask(USER, CHAT, 'goal');
+    const scope = { userId: USER, chatId: CHAT, taskId: task.id };
+    await setup(scope);
+    expect((await completeTask(scope)).status).toBe(expected);
+  }
 });

@@ -158,6 +158,8 @@ export function AssistantPage() {
     if (id)
       try {
         await request(ASSISTANT_API.cancel(id), 'POST');
+        // Cancel resolves after the host persisted the terminal task; reread it, never infer.
+        if (task?.taskId) void refreshTask(task.taskId);
       } catch (e) {
         setError((e as Error).message);
       }

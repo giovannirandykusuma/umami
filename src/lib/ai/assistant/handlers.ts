@@ -26,7 +26,13 @@ const analystModules = async () => ({
 });
 
 type Context = { params: Promise<{ chatId?: string }> };
-type Turn = { userId: string; controller: AbortController; interaction: Interaction };
+type Turn = {
+  userId: string;
+  controller: AbortController;
+  interaction: Interaction;
+  /** Settles after the turn's terminal state (task + message) is persisted. */
+  finished: Promise<void>;
+};
 /**
  * Active turns, shared by every route module in THIS process (Next dev may load the turn, reply
  * and cancel routes as separate module instances). Not persisted and not cross-process: a reply
@@ -109,7 +115,11 @@ export async function cancel(request: Request, context: Context): Promise<Respon
   const result = await owned(request, context);
   if (result.response) return result.response;
   const turn = running.get(result.chatId);
-  if (turn?.userId === result.userId) turn.controller.abort();
+  if (turn?.userId === result.userId) {
+    turn.controller.abort();
+    // Respond only once the cancellation is durable, so a follow-up task read is not stale.
+    await turn.finished;
+  }
   return json({ ok: true });
 }
 export async function runTurn(request: Request, context: Context): Promise<Response> {
@@ -230,7 +240,9 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
   );
   const deps = lifecycle?.analystDeps();
   const queryState = { queries: 0 };
-  running.set(chatId, { userId, controller, interaction });
+  let finish!: () => void;
+  const finished = new Promise<void>(resolve => (finish = resolve));
+  running.set(chatId, { userId, controller, interaction, finished });
   const disconnect = () => {
     disconnected = true;
     controller.abort();
@@ -247,6 +259,7 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
     await store.append(userId, chatId, userMessage);
   } catch {
     running.delete(chatId);
+    finish();
     request.signal.removeEventListener('abort', disconnect);
     return json({ error: 'Unable to save message' }, 500);
   }
@@ -266,6 +279,9 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
       void (async () => {
         let failure: string | undefined;
         let session: string | null | undefined;
+        let readbackBoard: string | null = null;
+        let readbackRevision: unknown;
+        let verified = false;
         // Legacy: fixed 5-minute wall clock. Analyst: 5 minutes of non-waiting execution.
         const timeout = analyst ? undefined : setTimeout(() => controller.abort(), 300000);
         if (analyst) arm(remainingAtPause);
@@ -302,6 +318,43 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
                       running: queryState,
                     },
                   );
+                  // Completion evidence comes from host tool results, never the attempted phase.
+                  const result = outcome.json as any;
+                  // Any other tool (e.g. a write) after readback invalidates earlier evidence.
+                  if (
+                    ![
+                      'analyst_readback',
+                      'analyst_verify_render',
+                      'analyst_record_inspection',
+                    ].includes(name)
+                  ) {
+                    readbackBoard = null;
+                    verified = false;
+                  }
+                  if (name === 'analyst_readback') verified = false;
+                  if (name === 'analyst_readback') readbackRevision = result?.data?.board?.revision;
+                  if (name === 'analyst_readback')
+                    readbackBoard =
+                      result?.ok === true &&
+                      Array.isArray(result.data?.analyses) &&
+                      result.data.analyses.length > 0 &&
+                      result.data.analyses.every(
+                        (a: any) =>
+                          a.execution && a.execution.ok !== false && a.matchesIntent !== false,
+                      )
+                        ? String(result.data.board?.id)
+                        : null;
+                  if (name === 'analyst_verify_render')
+                    verified =
+                      !!readbackBoard &&
+                      (args as any)?.boardId === readbackBoard &&
+                      // A rendered receipt, or visual_pending only because no verifier exists;
+                      // a failed/revoked render with a verifier configured is not eligible.
+                      (result?.ok === true ||
+                        (!deps.verifier &&
+                          result?.code === 'verifier_unavailable' &&
+                          result?.visualStatus === 'visual_pending'));
+                  if (name === 'analyst_record_inspection' && result?.ok !== true) verified = false;
                   // The tool may have persisted a lifecycle change (e.g. budget block); re-read it.
                   const persisted = await lifecycle.getTask(scope).catch(() => null);
                   if (persisted) emitTask(persisted.status);
@@ -330,6 +383,34 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
           if (scope && lifecycle && failure === 'Cancelled' && !deadlineHit)
             await lifecycle
               .cancelTask(scope)
+              .then(task => emitTask(task.status))
+              .catch(() => undefined);
+          // Done only after a successful data readback of a saved draft followed by an eligible
+          // verification outcome (receipt or data_verified_visual_pending); never on attempts alone.
+          if (
+            scope &&
+            lifecycle &&
+            !failure &&
+            !deadlineHit &&
+            !controller.signal.aborted &&
+            verified &&
+            (await lifecycle
+              .getTask(scope)
+              .then(
+                task =>
+                  // Evidence must match the current persisted draft revision, not a stale one.
+                  !!task?.draftIds.some(
+                    d => d.boardId === readbackBoard && d.revision === readbackRevision,
+                  ) &&
+                  (!deps?.verifier ||
+                    task.receipts.some(
+                      r => r.boardId === readbackBoard && r.boardRevision === readbackRevision,
+                    )),
+              )
+              .catch(() => false))
+          )
+            await lifecycle
+              .completeTask(scope)
               .then(task => emitTask(task.status))
               .catch(() => undefined);
           // Resolve any outstanding interactions and stop running tools on every terminal path.
@@ -364,6 +445,7 @@ export async function runTurn(request: Request, context: Context): Promise<Respo
             emit({ type: 'error', error: 'Unable to save assistant message', message });
           }
           running.delete(chatId);
+          finish();
           request.signal.removeEventListener('abort', disconnect);
           if (!disconnected) {
             try {

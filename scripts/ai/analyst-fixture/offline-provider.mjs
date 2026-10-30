@@ -97,6 +97,9 @@ export function nextStep(messages) {
     case 4:
       if (!board || committed.length < 2)
         return { text: `Repair failed: ${json?.code ?? 'unknown'}` };
+      // Repair invalidates the earlier readback; check the saved current revision again.
+      return { tool: 'analyst_readback', args: { boardId: board.id } };
+    case 5:
       return { tool: 'analyst_verify_render', args: { boardId: board.id } };
     default:
       return {

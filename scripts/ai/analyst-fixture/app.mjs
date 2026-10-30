@@ -5,17 +5,17 @@
 // The assistant runs the synthetic-only offline provider (no live provider, no fallback), and
 // the verifier uses the restricted Docker launcher when its local image exists.
 import { spawn, spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   cpSync,
-  mkdirSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
-  realpathSync,
-  readFileSync,
-  statSync,
   readdirSync,
+  readFileSync,
+  realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -86,12 +86,10 @@ export function sanitizedProject(checkout, nonce) {
     ),
   );
   // Dependencies are shared read-only (symlink); nothing is written through it.
-  symlinkSync(join(checkout, 'node_modules'), join(dir, 'node_modules'));
+  // Real path: workspace links (@umami/* -> ../../packages) must resolve to the built packages.
+  symlinkSync(realpathSync(join(checkout, 'node_modules')), join(dir, 'node_modules'));
   mkdirSync(join(dir, '.home'));
-  writeFileSync(
-    join(dir, '.analyst-fixture-receipt.json'),
-    JSON.stringify({ mode: 'analyst-synthetic-v1', nonce }),
-  );
+  writeReceipt(dir, nonce);
   const leaked = readdirSync(dir, { recursive: true }).filter(
     p => !String(p).startsWith('node_modules') && isEnvFile(basename(String(p))),
   );
@@ -102,18 +100,51 @@ export function sanitizedProject(checkout, nonce) {
   return dir;
 }
 
+const sha256 = value => createHash('sha256').update(value).digest('hex');
 /**
+ * Launcher-owned synthetic marker (runtime.ts offlineFixtureRuntime verifies every field): binds
+ * the nonce by hash, this exact root, the packaged provider file and its issue time; in built
+ * mode also the BUILD_ID of the Next build made here. Only this launcher writes it.
+ */
+export function writeReceipt(dir, nonce, buildId) {
+  writeFileSync(
+    join(dir, '.analyst-fixture-receipt.json'),
+    JSON.stringify({
+      mode: 'analyst-synthetic-v1',
+      nonceSha256: sha256(nonce),
+      root: realpathSync(dir),
+      providerSha256: sha256(
+        readFileSync(join(dir, 'scripts/ai/analyst-fixture/offline-provider.mjs')),
+      ),
+      issuedAt: Date.now(),
+      ...(buildId ? { buildId } : {}),
+    }),
+    { mode: 0o600 },
+  );
+}
+
+/**
+ * `built`: production Next build/start of the sanitized project (NODE_ENV=production); the
+ * offline runtime then additionally requires the receipt's BUILD_ID binding.
  * `flagsOff`: explicit synthetic default-off mode (AI_ANALYST_ENABLED and the verifier flag unset,
  * so lifecycle creation is disabled while saved-analysis execution stays available). The offline
  * fixture runtime is analyst-only, so it is also omitted; there is no live fallback either way.
  */
-export function fixtureEnv({ dir, port, nonce, piRoot, verifier, flagsOff = false }) {
+export function fixtureEnv({
+  dir,
+  port,
+  nonce,
+  piRoot,
+  verifier,
+  flagsOff = false,
+  built = false,
+}) {
   return {
     PATH: process.env.PATH,
     // Fixture-owned home/tmp: Pi scratch ancestors never include shared host dirs like /tmp/.pi.
     HOME: join(dir, '.home'),
     TMPDIR: join(dir, '.home'),
-    NODE_ENV: 'development',
+    NODE_ENV: built ? 'production' : 'development',
     NODE_OPTIONS: '--max-old-space-size=2048',
     PORT: port,
     NEXT_TELEMETRY_DISABLED: '1',
@@ -138,6 +169,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!/^\d+$/.test(port) || ['3000', '3317'].includes(port))
     throw new Error('Refusing shared port');
   const flagsOff = process.env.ANALYST_FIXTURE_FLAGS === 'off';
+  const built = process.env.ANALYST_FIXTURE_BUILT === '1';
   const piRoot = process.env.AI_PI_ROOT;
   if (!piRoot && !flagsOff)
     throw new Error('AI_PI_ROOT (pinned Pi install) required for the offline turn');
@@ -153,17 +185,54 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     env: { PATH: process.env.PATH, HOME: '/tmp', DATABASE_URL: FIXTURE_DATABASE },
   });
   if (generated.status !== 0) throw new Error('prisma generate failed');
-  console.log(JSON.stringify({ fixtureProject: dir, verifier, flagsOff }));
-  const child = spawn(
-    join(dir, 'node_modules/.bin/next'),
-    ['dev', '--webpack', '--hostname', '127.0.0.1', '--port', port],
-    {
+  console.log(JSON.stringify({ fixtureProject: dir, verifier, flagsOff, built }));
+  const env = { dir, port, nonce, piRoot, verifier, built };
+  const next = join(dir, 'node_modules/.bin/next');
+  const children = [];
+  if (built) {
+    // next.config validateSourceUrl requires a source pointer in production (build AND start).
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+    const sourceUrl = `https://github.com/giovannirandykusuma/umami/tree/${head}`;
+    // Build once, synthetic-only env (no host secrets); then start flags-on and, when asked,
+    // a flags-off server from the SAME build. Production servers stay small, unlike dev.
+    const build = spawnSync(next, ['build', '--webpack'], {
       cwd: dir,
       stdio: 'inherit',
-      env: fixtureEnv({ dir, port, nonce, piRoot, verifier, flagsOff }),
-    },
-  );
-  const stop = signal => child.kill(signal);
+      env: {
+        ...fixtureEnv({ ...env, flagsOff: true }),
+        NODE_OPTIONS: '--max-old-space-size=4096',
+        BUILD_WORKERS: '1',
+        NEXT_PUBLIC_SOURCE_URL: sourceUrl,
+      },
+    });
+    if (build.status !== 0) throw new Error('next build failed');
+    writeReceipt(dir, nonce, readFileSync(join(dir, '.next/BUILD_ID'), 'utf8').trim());
+    const offPort = process.env.ANALYST_FIXTURE_FLAGS_OFF_PORT;
+    if (offPort && (!/^\d+$/.test(offPort) || ['3000', '3317', port].includes(offPort)))
+      throw new Error('Refusing shared port');
+    for (const [p, off] of [[port, flagsOff], ...(offPort ? [[offPort, true]] : [])])
+      children.push(
+        spawn(next, ['start', '--hostname', '127.0.0.1', '--port', p], {
+          cwd: dir,
+          stdio: 'inherit',
+          env: {
+            ...fixtureEnv({ ...env, port: p, flagsOff: off }),
+            NEXT_PUBLIC_SOURCE_URL: sourceUrl,
+          },
+        }),
+      );
+  } else
+    children.push(
+      spawn(next, ['dev', '--webpack', '--hostname', '127.0.0.1', '--port', port], {
+        cwd: dir,
+        stdio: 'inherit',
+        env: fixtureEnv({ ...env, flagsOff }),
+      }),
+    );
+  const [child] = children;
+  const stop = signal => {
+    for (const c of children) c.kill(signal);
+  };
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => stop(signal));
   child.on('exit', (code, signal) => {
     if (code === 0) {

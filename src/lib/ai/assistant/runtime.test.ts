@@ -1,14 +1,30 @@
 // @vitest-environment node
-import { existsSync, globSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  cpSync,
+  existsSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
+
 vi.mock('@/lib/prisma', () => ({ default: {} }));
+
 import { ANALYST_TOOLS } from './analyst/tools';
 import {
   BASE_TOOLS,
+  fixtureDatabaseVerified,
   OFFLINE_FIXTURE_DATABASE,
+  OFFLINE_FIXTURE_RECEIPT_MS,
   offlineFixtureRuntime,
   runAssistantProcess,
 } from './runtime';
@@ -406,14 +422,98 @@ describe('offline fixture runtime selector', () => {
     NODE_ENV: 'development',
     DATABASE_URL: OFFLINE_FIXTURE_DATABASE,
   };
-  const project = () => {
-    const dir = mkdtempSync(resolve(tmpdir(), 'offline-fixture-'));
+  const sha = (v: string | Buffer) => createHash('sha256').update(v).digest('hex');
+  const providerSource = 'scripts/ai/analyst-fixture/offline-provider.mjs';
+  // Mirrors the launcher (app.mjs writeReceipt): root-, nonce-, provider- and time-bound.
+  const project = (change: Record<string, unknown> = {}, prefix = 'umami-analyst-fixture-') => {
+    const dir = realpathSync(mkdtempSync(resolve(tmpdir(), prefix)));
+    mkdirSync(resolve(dir, 'scripts/ai/analyst-fixture'), { recursive: true });
+    cpSync(providerSource, resolve(dir, providerSource));
+    mkdirSync(resolve(dir, '.next'));
+    writeFileSync(resolve(dir, '.next/BUILD_ID'), 'build-1');
     writeFileSync(
       resolve(dir, '.analyst-fixture-receipt.json'),
-      JSON.stringify({ mode: 'analyst-synthetic-v1', nonce }),
+      JSON.stringify({
+        mode: 'analyst-synthetic-v1',
+        nonceSha256: sha(nonce),
+        root: dir,
+        providerSha256: sha(readFileSync(providerSource)),
+        issuedAt: Date.now(),
+        ...change,
+      }),
     );
     return dir;
   };
+  const refuses = (env: Record<string, string | undefined>, dir: string, now?: number) => {
+    try {
+      expect(() => offlineFixtureRuntime(env, dir, now)).toThrow('Offline fixture runtime refused');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  it('built production app: accepted only with the receipt-bound BUILD_ID', () => {
+    const prod = { ...fixtureEnv, NODE_ENV: 'production' };
+    const dir = project({ buildId: 'build-1' });
+    try {
+      expect(offlineFixtureRuntime(prod, dir)?.env.AI_PROVIDER).toBe('umami-offline-fixture');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    refuses(prod, project()); // ordinary dev receipt cannot authorize production
+    refuses(prod, project({ buildId: 'other-build' }));
+  });
+  it.each([
+    ['stale receipt', { issuedAt: Date.now() - OFFLINE_FIXTURE_RECEIPT_MS - 1 }],
+    ['future receipt', { issuedAt: Date.now() + 60_000 }],
+    ['forged nonce hash', { nonceSha256: sha('cd'.repeat(32)) }],
+    ['plaintext nonce (legacy receipt)', { nonceSha256: undefined, nonce }],
+    ['wrong root', { root: '/tmp/umami-analyst-fixture-elsewhere' }],
+    ['tampered provider', { providerSha256: sha('other') }],
+  ])('refuses forged receipt: %s', (_name, change) => refuses(fixtureEnv, project(change)));
+  it('writable-attacker forgeries: a fully self-consistent receipt without the env nonce fails', () => {
+    // Attacker can write any file in the root but does not hold the launcher's env nonce.
+    const attacker = 'ef'.repeat(32);
+    refuses({ ...fixtureEnv, AI_OFFLINE_FIXTURE_NONCE: attacker }, project());
+    refuses(fixtureEnv, project({ nonceSha256: sha(attacker) }));
+    // Rewriting the provider file after the launcher hashed it.
+    const swapped = project();
+    writeFileSync(resolve(swapped, providerSource), '// replaced');
+    refuses(fixtureEnv, swapped);
+    // Copying a valid receipt into another root.
+    const source = project();
+    const copy = project({}, 'umami-analyst-fixture-');
+    cpSync(
+      resolve(source, '.analyst-fixture-receipt.json'),
+      resolve(copy, '.analyst-fixture-receipt.json'),
+    );
+    rmSync(source, { recursive: true, force: true });
+    refuses(fixtureEnv, copy);
+    // Planted symlink receipt (regular files only).
+    const linked = project();
+    const real = resolve(linked, 'real.json');
+    cpSync(resolve(linked, '.analyst-fixture-receipt.json'), real);
+    rmSync(resolve(linked, '.analyst-fixture-receipt.json'));
+    symlinkSync(real, resolve(linked, '.analyst-fixture-receipt.json'));
+    refuses(fixtureEnv, linked);
+    // Rewriting BUILD_ID to match a forged buildId still needs the nonce; with the real nonce,
+    // a receipt whose buildId differs from the root's build is refused.
+    const build = project({ buildId: 'build-1' });
+    writeFileSync(resolve(build, '.next/BUILD_ID'), 'build-2');
+    refuses({ ...fixtureEnv, NODE_ENV: 'production' }, build);
+  });
+  it('refuses a receipt outside a launcher-owned root', () =>
+    refuses(fixtureEnv, project({}, 'offline-fixture-')));
+  it('database marker: requires both the synthetic engine and fixture schema receipts', async () => {
+    const row = (engine: string, schema: string) => async () => [{ engine, schema }];
+    expect(
+      await fixtureDatabaseVerified(row('umami-ai-synthetic-r3', 'umami-analyst-fixture-r1')),
+    ).toBe(true);
+    expect(await fixtureDatabaseVerified(row('other', 'umami-analyst-fixture-r1'))).toBe(false);
+    expect(await fixtureDatabaseVerified(row('umami-ai-synthetic-r3', 'other'))).toBe(false);
+    expect(await fixtureDatabaseVerified(async () => Promise.reject(new Error('no table')))).toBe(
+      false,
+    );
+  });
   it('is absent unless requested and accepts only the verified fixture context', () => {
     expect(offlineFixtureRuntime({ AI_ENABLED: 'true' }, process.cwd())).toBeNull();
     const dir = project();
@@ -424,13 +524,15 @@ describe('offline fixture runtime selector', () => {
     }
   });
   it.each([
-    ['production', { NODE_ENV: 'production' }],
+    ['production without build binding', { NODE_ENV: 'production' }],
     ['non-fixture database', { DATABASE_URL: 'postgresql://umami@db:5432/umami' }],
     ['wrong mode', { AI_OFFLINE_FIXTURE: 'true' }],
     ['missing nonce', { AI_OFFLINE_FIXTURE_NONCE: undefined }],
     ['foreign nonce', { AI_OFFLINE_FIXTURE_NONCE: 'cd'.repeat(32) }],
     ['live provider configured', { AI_PROVIDER: 'openai' }],
     ['live provider key present', { AI_PROVIDER_KEY: 'sk-live' }],
+    ['live AI enabled', { AI_ENABLED: 'true' }],
+    ['ambient vendor credential', { OPENAI_API_KEY: 'sk-live' }],
   ])('refuses (no live fallback): %s', (_name, change) => {
     const dir = project();
     try {
@@ -442,7 +544,7 @@ describe('offline fixture runtime selector', () => {
     }
   });
   it('refuses without the launcher receipt (e.g. a normal checkout)', () => {
-    const dir = mkdtempSync(resolve(tmpdir(), 'offline-fixture-'));
+    const dir = mkdtempSync(resolve(tmpdir(), 'umami-analyst-fixture-'));
     try {
       expect(() => offlineFixtureRuntime(fixtureEnv, dir)).toThrow(
         'Offline fixture runtime refused',
@@ -501,6 +603,7 @@ describe('offline fixture runtime selector', () => {
         'analyst_commit_draft',
         'analyst_readback',
         'analyst_commit_draft',
+        'analyst_readback',
         'analyst_verify_render',
       ]);
       expect(
@@ -511,7 +614,7 @@ describe('offline fixture runtime selector', () => {
       ).toBe('Offline fixture turn complete; render status: visual_pending');
       function writeReceipt() {
         const dir = project();
-        afterAll(() => rmSync(dir, { recursive: true, force: true }));
+        onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
         return dir;
       }
     },

@@ -11,6 +11,10 @@
     "ai-ui-fixture": {
       "command": "AI_ENABLED=false DATABASE_URL=postgresql://synthetic:synthetic@127.0.0.1:1/synthetic npx --yes pnpm@12.3.4 exec next dev --webpack --hostname 127.0.0.1 --port 3317",
       "type": "service"
+    },
+    "analyst-fixture-built": {
+      "command": "PATH=/Users/randy/.npm/_npx/52027bd8fc0022aa/node_modules/.bin:$PATH AI_PI_ROOT=/Users/randy/.local/lib/node_modules/@earendil-works/pi-coding-agent ANALYST_FIXTURE_BUILT=1 ANALYST_FIXTURE_PORT=3341 ANALYST_FIXTURE_FLAGS_OFF_PORT=3342 node scripts/ai/analyst-fixture/app.mjs",
+      "type": "service"
     }
   }
 }

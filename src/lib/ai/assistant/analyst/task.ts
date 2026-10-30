@@ -451,6 +451,16 @@ export function block(
     context: { ...task.context, blockedReason: reason },
   }));
 }
+/**
+ * Settles a successfully finished turn that reached render: the task's authority closes. Only a
+ * plain 'running' task completes; a paused (awaiting_user) or blocked task is left unchanged.
+ * Receipts keep their recorded status (e.g. rendered_not_inspected); nothing is marked verified.
+ */
+export function completeTask(scope: TaskScope) {
+  return updateTask(scope, task =>
+    task.status === 'running' && !task.pausedAt ? { ...task, status: 'complete' } : task,
+  );
+}
 export function cancelTask(scope: TaskScope) {
   return updateTask(scope, task => ({ ...task, status: 'cancelled', pausedAt: null }));
 }

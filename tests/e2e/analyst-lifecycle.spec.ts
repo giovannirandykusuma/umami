@@ -34,7 +34,8 @@ test.beforeAll(async ({ request }, testInfo) => {
       } catch (error) {
         if (attempt || !/ECONNRESET|ECONNREFUSED|socket hang up/.test(String(error))) throw error;
         await testInfo.attach('startup-worker-restart', {
-          contentType: 'text/plain', body: Buffer.from(`${path}: ${String(error)}`),
+          contentType: 'text/plain',
+          body: Buffer.from(`${path}: ${String(error)}`),
         });
       }
     }
@@ -85,6 +86,7 @@ test('create → readback → repair → render via real SSE task events, then l
   const task = await runTurn(page);
   // Host-derived phase from the authoritative SSE `task` event; never complete-by-inference.
   await expect(task).toHaveAttribute('data-task-phase', 'render');
+  await expect(task).toHaveAttribute('data-task-status', 'complete');
   const receipts = task.getByLabel('Render receipts');
   await expect(receipts).toContainText('Rendered, not visually verified');
   await expect(receipts.locator('[data-receipt-status="inspected"]')).toHaveCount(0);

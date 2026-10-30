@@ -1,16 +1,18 @@
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
-import { gatewayConfig, permissionArgs, reasoningLevel } from '../rpc/confinement.mjs';
-import { assistantPrompt } from './prompt';
-import { boundedSession } from './store';
-import { ANALYST_TOOLS } from './analyst/tools';
-import { sanitize, sanitizeSession } from './analyst/sanitize';
 import { isAnalystEnabled } from '@/lib/analyst/flags';
+import prisma from '@/lib/prisma';
+import { gatewayConfig, permissionArgs, reasoningLevel } from '../rpc/confinement.mjs';
+import { sanitize, sanitizeSession } from './analyst/sanitize';
+import { ANALYST_TOOLS } from './analyst/tools';
+import { assistantPrompt } from './prompt';
 import type { AssistantPart, AssistantStreamEvent, AssistantTurnContext } from './protocol';
+import { boundedSession } from './store';
 import { truncate } from './tools';
 
 export interface RuntimeInput {
@@ -60,32 +62,73 @@ export interface RuntimeOptions {
 export const OFFLINE_FIXTURE_DATABASE =
   'postgresql://ai_synthetic@127.0.0.1:25432/ai_synthetic?schema=analyst_fixture';
 const OFFLINE_FIXTURE_MODE = 'analyst-synthetic-v1';
-const LIVE_KEYS = ['AI_PROVIDER', 'AI_MODEL', 'AI_BASE_URL', 'AI_PROVIDER_KEY', 'AI_EGRESS_ORIGINS'];
+const LIVE_KEYS = [
+  'AI_ENABLED',
+  'AI_PROVIDER',
+  'AI_MODEL',
+  'AI_BASE_URL',
+  'AI_PROVIDER_KEY',
+  'AI_EGRESS_ORIGINS',
+];
+/** Receipts older than this are stale: each launcher run writes a fresh one. */
+export const OFFLINE_FIXTURE_RECEIPT_MS = 12 * 60 * 60_000;
+const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 
 /**
  * Synthetic-only deterministic runtime selector. Server env only (never request/model input).
  * Returns null when not requested; throws (fail closed, never a live fallback) when requested
- * outside a positively verified fixture context: non-production, the exact synthetic database,
- * the launcher-written receipt matching its nonce, and no live provider configuration at all.
+ * outside a positively verified fixture context: the exact synthetic database, no live provider
+ * configuration or credential at all, and a fresh launcher-written receipt in the launcher's own
+ * sanitized project root that binds the env nonce (by hash), that root and the packaged provider
+ * file hash. NODE_ENV=production is accepted only when the receipt also binds the BUILD_ID of the
+ * Next build the launcher made inside that same root; ordinary deployments have no such receipt.
+ * The database's own synthetic marker is checked separately (fixtureDatabaseVerified).
  */
-export function offlineFixtureRuntime(env: Record<string, string | undefined>, cwd: string) {
+export function offlineFixtureRuntime(
+  env: Record<string, string | undefined>,
+  cwd: string,
+  now = Date.now(),
+) {
   if (env.AI_OFFLINE_FIXTURE === undefined) return null;
   const fail = () => {
     throw new Error('Offline fixture runtime refused outside the verified synthetic fixture');
   };
   if (env.AI_OFFLINE_FIXTURE !== OFFLINE_FIXTURE_MODE) fail();
-  if (env.NODE_ENV === 'production' || env.DATABASE_URL !== OFFLINE_FIXTURE_DATABASE) fail();
+  if (env.DATABASE_URL !== OFFLINE_FIXTURE_DATABASE) fail();
   if (LIVE_KEYS.some(key => env[key] !== undefined)) fail();
+  if (Object.keys(env).some(key => /(_API_KEY|_ACCESS_TOKEN)$/.test(key))) fail();
   const nonce = env.AI_OFFLINE_FIXTURE_NONCE;
   if (!nonce || !/^[0-9a-f]{64}$/.test(nonce)) fail();
+  const provider = resolve(cwd, 'scripts/ai/analyst-fixture/offline-provider.mjs');
   let receipt: any;
+  let root = '';
+  let providerHash = '';
+  let buildId: string | undefined;
   try {
-    receipt = JSON.parse(readFileSync(join(cwd, '.analyst-fixture-receipt.json'), 'utf8'));
+    root = realpathSync(cwd);
+    const receiptPath = join(root, '.analyst-fixture-receipt.json');
+    // Only the launcher-written regular file counts; a planted symlink does not.
+    if (!lstatSync(receiptPath).isFile()) fail();
+    receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+    if (!lstatSync(provider).isFile()) fail();
+    providerHash = sha256(readFileSync(provider));
+    if (env.NODE_ENV === 'production')
+      buildId = readFileSync(join(root, '.next/BUILD_ID'), 'utf8').trim();
   } catch {
     fail();
   }
-  if (receipt?.mode !== OFFLINE_FIXTURE_MODE || receipt?.nonce !== nonce) fail();
-  const provider = resolve(cwd, 'scripts/ai/analyst-fixture/offline-provider.mjs');
+  if (
+    receipt?.mode !== OFFLINE_FIXTURE_MODE ||
+    receipt.nonceSha256 !== sha256(nonce!) ||
+    receipt.root !== root ||
+    !basename(root).startsWith('umami-analyst-fixture-') ||
+    receipt.providerSha256 !== providerHash ||
+    !Number.isFinite(receipt.issuedAt) ||
+    receipt.issuedAt > now ||
+    now - receipt.issuedAt > OFFLINE_FIXTURE_RECEIPT_MS
+  )
+    fail();
+  if (env.NODE_ENV === 'production' && (!buildId || receipt.buildId !== buildId)) fail();
   return {
     provider,
     env: {
@@ -98,14 +141,35 @@ export function offlineFixtureRuntime(env: Record<string, string | undefined>, c
   };
 }
 
-export function runAssistant(input: RuntimeInput) {
+/** Independent database-side marker: the owned synthetic engine and this fixture's schema. */
+export async function fixtureDatabaseVerified(
+  query: (sql: string) => Promise<any[]> = sql => prisma.client.$queryRawUnsafe(sql),
+) {
+  try {
+    const [row] = await query(
+      "select (select owner from public.ai_synthetic_owner) as engine, obj_description('analyst_fixture'::regnamespace) as schema",
+    );
+    return row?.engine === 'umami-ai-synthetic-r3' && row?.schema === 'umami-analyst-fixture-r1';
+  } catch {
+    return false;
+  }
+}
+
+export async function runAssistant(input: RuntimeInput) {
   const offline = offlineFixtureRuntime(process.env, process.cwd());
   if (offline) {
     if (!input.analyst || !isAnalystEnabled()) throw new Error('Offline fixture is analyst-only');
+    if (!(await fixtureDatabaseVerified()))
+      throw new Error('Offline fixture runtime refused outside the verified synthetic fixture');
     const root = process.env.AI_PI_ROOT;
     if (!root || !isAbsolute(root)) throw new Error('AI installation must be absolute');
     return runAssistantProcess(input, {
-      env: { ...offline.env, AI_PI_ROOT: root, AI_REASONING_LEVEL: 'off', AI_ANALYST_ENABLED: 'true' },
+      env: {
+        ...offline.env,
+        AI_PI_ROOT: root,
+        AI_REASONING_LEVEL: 'off',
+        AI_ANALYST_ENABLED: 'true',
+      },
       bridge: resolve('scripts/ai/native.mjs'),
       offlineProvider: offline.provider,
       tools: [...BASE_TOOLS, ...ANALYST_TOOLS],

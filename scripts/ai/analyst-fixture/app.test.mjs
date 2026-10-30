@@ -6,17 +6,17 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
-  realpathSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { fixtureEnv, sanitizedProject, systemTemp } from './app.mjs';
+import { fixtureEnv, sanitizedProject, systemTemp, writeReceipt } from './app.mjs';
 
 const require = createRequire(import.meta.url);
 const nextEnv = require(
@@ -161,4 +161,37 @@ test('flags-off mode leaves analyst, offline runtime and verifier flags unset', 
   ])
     assert.equal(env[key], undefined, key);
   assert.equal(env.DATABASE_URL.endsWith('schema=analyst_fixture'), true);
+});
+
+test('launcher receipt binds root, nonce hash, provider hash and BUILD_ID; never the nonce', () => {
+  const checkout = fakeCheckout();
+  const nonce = 'ab'.repeat(32);
+  const project = sanitizedProject(checkout, nonce);
+  try {
+    assert.ok(basename(project).startsWith('umami-analyst-fixture-'));
+    writeReceipt(project, nonce, 'build-1');
+    const raw = readFileSync(join(project, '.analyst-fixture-receipt.json'), 'utf8');
+    const receipt = JSON.parse(raw);
+    assert.equal(raw.includes(nonce), false);
+    assert.equal(receipt.root, realpathSync(project));
+    assert.equal(receipt.buildId, 'build-1');
+    assert.match(receipt.providerSha256, /^[0-9a-f]{64}$/);
+    assert.ok(Date.now() - receipt.issuedAt < 60_000);
+  } finally {
+    rmSync(project, { recursive: true, force: true });
+    rmSync(checkout, { recursive: true, force: true });
+  }
+});
+
+test('built mode runs NODE_ENV=production with the same allowlist', () => {
+  const env = fixtureEnv({
+    dir: '/f',
+    port: '3341',
+    nonce: 'ab'.repeat(32),
+    piRoot: '/pi',
+    built: true,
+  });
+  assert.equal(env.NODE_ENV, 'production');
+  for (const key of ['AI_PROVIDER', 'AI_PROVIDER_KEY', 'AI_ENABLED'])
+    assert.equal(env[key], undefined);
 });
