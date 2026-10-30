@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   AnalysisError,
   COMPATIBILITY,
+  definitionSchema,
   hashDefinition,
   hashRequest,
   normalizeDefinition,
@@ -335,6 +336,7 @@ function versionsFor(
   bundle: any,
   boardId: string | undefined,
   repair?: { widgetId: string; reason: string },
+  before?: any,
 ) {
   const versions = [...task.definitionVersions];
   const latest = new Map<string, (typeof versions)[number]>();
@@ -344,7 +346,17 @@ function versionsFor(
   let semanticChange = false;
   const changedWidgets: string[] = [];
   const seen = new Set<string>();
+  const stored = new Map(widgets(before).map(w => [w.id, JSON.stringify(w.component)]));
   for (const w of widgets(bundle.board.parameters)) {
+    const prior0 = latest.get(w.id);
+    // A committed widget kept by its saved analysisId is the same definition, not a removal.
+    if (prior0?.analysisId && w.component?.props?.analysisId === prior0.analysisId) {
+      seen.add(w.id);
+      // Presentation-only change of a stable widget is repairable by that widget id.
+      if (stored.has(w.id) && stored.get(w.id) !== JSON.stringify(w.component))
+        changedWidgets.push(w.id);
+      continue;
+    }
     const a: any = byRef.get(w.component?.props?.analysisRef);
     if (!a) continue;
     seen.add(w.id);
@@ -406,6 +418,7 @@ async function commitDraft(input: AnalystInput, args: any, task: Task) {
     bundle,
     own?.boardId,
     args.repair,
+    own ? (await input.deps.getBoard(own.boardId))?.parameters : undefined,
   );
   if (semanticChange)
     return fail(
@@ -748,6 +761,22 @@ async function recordInspection(input: AnalystInput, args: any) {
   return error ? fail('invalid_arguments', error) : { ok: true, status: 'inspected' };
 }
 
+/** Exact shapes the model must send; the definition contract is generated from the host schema. */
+const CONTRACTS = {
+  definition: z.toJSONSchema(definitionSchema, { io: 'input' }),
+  widget: {
+    id: 'stable-widget-id',
+    component: {
+      type: 'AnalysisWidget',
+      props: {
+        analysisRef: 'bundle analysis ref (or analysisId once committed)',
+        visualization: 'line',
+      },
+    },
+  },
+  repair: { widgetId: 'id of the committed widget being changed', reason: 'why' },
+};
+
 async function discover(input: AnalystInput, args: { websiteId?: string }) {
   const websites = await input.deps.listWebsites(input.auth);
   if (args.websiteId && !websites.some(w => w.id === args.websiteId))
@@ -760,6 +789,7 @@ async function discover(input: AnalystInput, args: { websiteId?: string }) {
         ? { coverage: await input.deps.dateRange(input.auth, args.websiteId) }
         : {}),
       capabilities: { metrics: COMPATIBILITY, renderers: RENDERERS },
+      contracts: CONTRACTS,
       analyses: (await input.deps.listAnalyses(input.auth)).slice(0, 50),
       boards: (await input.deps.listBoards(input.auth)).slice(0, 50),
     }),

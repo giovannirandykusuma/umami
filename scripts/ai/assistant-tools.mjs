@@ -129,7 +129,8 @@ export default function (pi) {
     },
     { additionalProperties: false },
   );
-  const strict = props => Type.Object(props, { additionalProperties: false });
+  const strict = (props, options = {}) =>
+    Type.Object(props, { ...options, additionalProperties: false });
   const parameters = {
     analytics_schema: strict(range),
     find_people: strict({
@@ -236,6 +237,116 @@ export default function (pi) {
   // Host re-validates every field strictly; these schemas only keep calls well-formed. No
   // taskId, principal, URL, capability or credential field exists in any analyst schema.
   const uuid = Type.String({ format: 'uuid' });
+  // Mirrors src/lib/analyst/definition.ts definitionSchema exactly (host still re-validates).
+  const dims = [
+    'path',
+    'title',
+    'referrer',
+    'query',
+    'hostname',
+    'tag',
+    'utmSource',
+    'utmMedium',
+    'utmCampaign',
+    'utmContent',
+    'utmTerm',
+    'browser',
+    'os',
+    'device',
+    'country',
+    'region',
+    'city',
+    'language',
+  ];
+  const owner = enumeration(['event', 'session']);
+  const definition = strict(
+    {
+      schemaVersion: Type.Literal(1),
+      source: strict({ websiteId: uuid }),
+      operation: enumeration(['series', 'breakdown', 'totals', 'numeric_property']),
+      metric: Type.String({
+        description:
+          'series: pageviews|sessions|events; breakdown: sessions|events; totals: pageviews|visits|sessions|events|identified_users; numeric_property: sum|average|median|min|max|count',
+      }),
+      event: optional(
+        Type.String({ description: 'Exact custom event name; required only for metric events' }),
+      ),
+      filters: optional(
+        Type.Array(
+          strict({
+            dimension: enumeration([...dims, 'distinctId']),
+            operator: enumeration(['eq', 'neq', 'c', 'dnc']),
+            values: Type.Array(Type.String(), { minItems: 1, maxItems: 20 }),
+          }),
+          { maxItems: 20 },
+        ),
+      ),
+      propertyFilters: optional(
+        Type.Array(
+          strict({
+            owner,
+            name: string(),
+            dataType: enumeration([1, 2, 4]),
+            operator: enumeration(['eq', 'neq', 'c', 'dnc', 'gt', 'gte', 'lt', 'lte', 'bf', 'af']),
+            value: string(),
+          }),
+          { maxItems: 20 },
+        ),
+      ),
+      groupBy: optional(
+        strict({
+          dimension: enumeration(dims),
+          top: optional(Type.Integer({ minimum: 1, maximum: 50 })),
+        }),
+      ),
+      unit: optional(enumeration(['hour', 'day', 'month'])),
+      property: optional(strict({ owner, name: string() })),
+      datePolicy: Type.Union([
+        strict({
+          type: Type.Literal('fixed'),
+          startAt: Type.Integer({ minimum: 0 }),
+          endAt: Type.Integer({ minimum: 1, description: 'Exclusive end, Unix ms' }),
+        }),
+        strict({
+          type: Type.Literal('rolling'),
+          window: enumeration(['today', '24h', '7d', '30d', '90d']),
+        }),
+      ]),
+      timezone: Type.String({ description: 'IANA timezone, e.g. UTC' }),
+      semanticBinding: strict({
+        label: string(),
+        unit: string(),
+        population: string(),
+        meaningSource: enumeration(['user_confirmed', 'repository_definition', 'observed_only']),
+      }),
+    },
+    {
+      description:
+        'unit is required for series and forbidden otherwise; groupBy only for breakdown. No visualization field (that is a widget prop).',
+    },
+  );
+  const widget = strict({
+    id: Type.String({ maxLength: 64, description: 'Stable widget id; repair names this id' }),
+    size: optional(Type.Number()),
+    component: strict({
+      type: Type.Literal('AnalysisWidget'),
+      props: Type.Union([
+        strict({
+          analysisRef: Type.String({ description: 'ref of an analysis in this bundle' }),
+          visualization: enumeration(['line', 'bar', 'table', 'metric']),
+          title: optional(string()),
+        }),
+        strict({
+          analysisId: Type.String({
+            format: 'uuid',
+            description: 'Already committed analysis id (keep it to revise a stable widget)',
+          }),
+          visualization: enumeration(['line', 'bar', 'table', 'metric']),
+          title: optional(string()),
+        }),
+      ]),
+    }),
+  });
   const bundle = {
     boardId: optional(uuid),
     expectedRevision: optional(Type.Integer({ minimum: 1 })),
@@ -243,22 +354,36 @@ export default function (pi) {
       type: Type.Literal('mixed'),
       name: string(),
       description: optional(string()),
-      parameters: Type.Object({}),
+      parameters: strict({
+        rows: Type.Array(
+          strict({
+            id: string(),
+            size: optional(Type.Number()),
+            columns: Type.Array(widget, { maxItems: 12 }),
+          }),
+        ),
+      }),
     }),
     analyses: Type.Array(
       strict({
         ref: string(),
         name: string(),
         description: optional(string()),
-        definition: Type.Object({}),
+        definition,
       }),
       { maxItems: 12 },
     ),
   };
-  const repair = strict({ widgetId: string(), reason: string() });
+  const repair = strict({
+    widgetId: Type.String({
+      maxLength: 64,
+      description: 'id of a committed widget of this draft whose definition or props change',
+    }),
+    reason: Type.String({ maxLength: 300 }),
+  });
   Object.assign(parameters, {
     analyst_discover: strict({ websiteId: optional(uuid) }),
-    analyst_preview: strict({ definition: Type.Object({}) }),
+    analyst_preview: strict({ definition }),
     analyst_plan_board: strict(bundle),
     analyst_commit_draft: strict({ ...bundle, operationKey: string(), repair: optional(repair) }),
     analyst_readback: strict({ boardId: uuid }),
@@ -296,11 +421,11 @@ export default function (pi) {
     analyst_discover:
       'List authorized websites, date coverage, metric capabilities, saved analyses and boards. No bulk property-value enumeration.',
     analyst_preview:
-      'Validate and execute an unsaved analysis definition read-only; returns provenance and completeness.',
+      'Validate and execute an unsaved analysis definition read-only; returns provenance and completeness. Definition is the exact nested schemaVersion 1 object (source, operation, datePolicy, semanticBinding).',
     analyst_plan_board:
       'Validate a proposed board bundle without mutation; returns the diff and whether confirmation is required.',
     analyst_commit_draft:
-      "Idempotently create or revise this task's own private draft board. Changing a committed definition requires repair provenance and may not change its meaning.",
+      "Idempotently create or revise this task's own private draft board. Widgets are {id, component:{type:'AnalysisWidget', props:{analysisRef|analysisId, visualization}}}. To revise, pass boardId + expectedRevision and keep each stable widget id; keep committed widgets by analysisId or resend them by analysisRef. Changing a committed widget requires repair.widgetId naming that widget id and may not change meaning.",
     analyst_readback:
       'Read stored board/analysis revisions and execute saved queries to compare with intent.',
     analyst_verify_render:

@@ -250,6 +250,16 @@ export function resolveBundleRefs(parameters: any, ids: Record<string, string>) 
       ...row,
       columns: (row.columns ?? []).map((column: any) => {
         const props = column.component?.props;
+        // A ref anywhere but AnalysisWidget props would be stored unresolved and never link.
+        if (
+          (column.component && 'analysisRef' in column.component) ||
+          (props?.analysisRef !== undefined && column.component.type !== 'AnalysisWidget')
+        )
+          throw new AnalysisError(
+            'invalid_definition',
+            'analysisRef belongs only in AnalysisWidget props',
+            'board.parameters',
+          );
         if (!props || props.analysisRef === undefined) return column;
         const { analysisRef, ...rest } = props;
         if (!ids[analysisRef])

@@ -134,3 +134,58 @@ test('converts only the host image envelope for analyst_verify_render into image
   const api = tools.find(t => t.name === 'umami_api');
   await assert.rejects(call(api, envelope(max.slice(0, 1))), /Invalid host image result/);
 });
+test('analyst schemas expose the exact nested definition/widget/repair contracts before the call', async () => {
+  const { Value } = await import(
+    pathToFileURL(typebox.replace('index.mjs', 'value/index.mjs')).href
+  );
+  const { FormatRegistry } = await import(pathToFileURL(typebox).href);
+  FormatRegistry.Set('uuid', v => /^[0-9a-f-]{36}$/i.test(v));
+  process.env.AI_ANALYST_ENABLED = 'true';
+  const tools = [];
+  extension.default({ registerTool: t => tools.push(t), on() {} });
+  delete process.env.AI_ANALYST_ENABLED;
+  const schema = name => tools.find(t => t.name === name).parameters;
+  const registeredDefinition = schema('analyst_preview').properties.definition;
+  assert.equal(
+    registeredDefinition.description,
+    'unit is required for series and forbidden otherwise; groupBy only for breakdown. No visualization field (that is a widget prop).',
+  );
+  assert.equal(registeredDefinition.additionalProperties, false);
+  const site = '8991b2f4-f857-4264-b911-e502f2eba3e2';
+  const definition = {
+    schemaVersion: 1,
+    source: { websiteId: site },
+    operation: 'series',
+    metric: 'pageviews',
+    datePolicy: { type: 'fixed', startAt: 0, endAt: 1 },
+    unit: 'hour',
+    timezone: 'UTC',
+    semanticBinding: { label: 'L', unit: 'u', population: 'p', meaningSource: 'user_confirmed' },
+  };
+  assert.ok(Value.Check(schema('analyst_preview'), { definition }));
+  // First guesses from the production run are rejected by the schema, not after a host round trip.
+  for (const bad of [
+    { websiteId: site, type: 'series', metric: 'pageviews', startAt: 0, endAt: 1 },
+    { ...definition, visualization: 'line' },
+    { ...definition, datePolicy: { type: 'absolute', startAt: 0, endAt: 1 } },
+    { ...definition, semanticBinding: { label: 'L' } },
+  ])
+    assert.ok(!Value.Check(schema('analyst_preview'), { definition: bad }));
+  const commit = component => ({
+    board: {
+      type: 'mixed',
+      name: 'B',
+      parameters: { rows: [{ id: 'r', columns: [{ id: 'w', component }] }] },
+    },
+    analyses: [{ ref: 'a', name: 'A', definition }],
+    operationKey: 'k',
+  });
+  const good = { type: 'AnalysisWidget', props: { analysisRef: 'a', visualization: 'line' } };
+  assert.ok(Value.Check(schema('analyst_commit_draft'), commit(good)));
+  assert.ok(
+    !Value.Check(
+      schema('analyst_commit_draft'),
+      commit({ type: 'SavedAnalysis', analysisRef: 'a', props: { chartType: 'line' } }),
+    ),
+  );
+});

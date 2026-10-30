@@ -190,3 +190,19 @@ test('task fence: an abort that lands while writes are awaited rolls the whole b
   }
   expect(written().every(rows => rows.length === 0)).toBe(true);
 });
+
+test('resolveBundleRefs rejects refs that would be stored unresolved (production shape)', async () => {
+  const { resolveBundleRefs } = await import('./analysis');
+  const params = (component: any) => ({ rows: [{ id: 'r', columns: [{ id: 'w', component }] }] });
+  for (const component of [
+    { type: 'SavedAnalysis', analysisRef: 'a', props: { chartType: 'line' } },
+    { type: 'SavedAnalysis', props: { analysisRef: 'a' } },
+  ])
+    expect(() => resolveBundleRefs(params(component), { a: 'id' })).toThrow(/AnalysisWidget/);
+  expect(
+    resolveBundleRefs(
+      params({ type: 'AnalysisWidget', props: { analysisRef: 'a', visualization: 'line' } }),
+      { a: 'id' },
+    ).rows[0].columns[0].component.props,
+  ).toEqual({ analysisId: 'id', visualization: 'line' });
+});

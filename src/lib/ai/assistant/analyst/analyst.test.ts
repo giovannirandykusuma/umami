@@ -684,3 +684,67 @@ it('adds analyst lifecycle prompt rules only for analyst turns', async () => {
   expect(assistantPrompt()).not.toContain('analyst_request_change');
   expect(assistantPrompt(undefined, true)).toContain('analyst_request_change');
 });
+
+it('stable widget repair: keeping a committed widget by analysisId is repairable by widget id', async () => {
+  const { run } = await setup();
+  const first: any = (await run('analyst_commit_draft', { ...bundle(), operationKey: 's1' })).json;
+  const analysisId = first.analyses[0].id;
+  let revision = first.board.revision;
+  const keep = (visualization: string, key: string, repair?: any) => {
+    const b: any = bundle();
+    b.analyses = [];
+    b.board.parameters.rows[0].columns[0].component.props = { analysisId, visualization };
+    return run('analyst_commit_draft', {
+      ...b,
+      boardId: first.board.id,
+      expectedRevision: revision,
+      operationKey: key,
+      ...(repair ? { repair } : {}),
+    }).then(r => {
+      if ((r.json as any).ok) revision = (r.json as any).board.revision;
+      return r.json;
+    });
+  };
+  // Pre-fix production failure: this exact repair was denied as "not a changed widget".
+  expect(await keep('bar', 's2', { widgetId: 'w1', reason: 'bind' })).toMatchObject({ ok: true });
+  expect(await keep('line', 's3')).toMatchObject({ code: 'repair_required' });
+  expect(await keep('line', 's4', { widgetId: 'w9', reason: 'x' })).toMatchObject({
+    code: 'invalid_arguments',
+  });
+  expect(await keep('line', 's5', { widgetId: 'w1', reason: 'again' })).toMatchObject({ ok: true });
+  expect(await keep('bar', 's6', { widgetId: 'w1', reason: 'third' })).toMatchObject({
+    code: 'repair_limit',
+  });
+});
+
+it('a stable-widget repair never edits a board the task did not create', async () => {
+  const { run, boards } = await setup();
+  boards.set(BOARD, { id: BOARD, revision: 1, userId: USER, teamId: null, parameters: {} });
+  expect(
+    (
+      await run('analyst_commit_draft', {
+        ...bundle(),
+        boardId: BOARD,
+        expectedRevision: 1,
+        operationKey: 'x',
+        repair: { widgetId: 'w1', reason: 'x' },
+      })
+    ).json,
+  ).toMatchObject({ code: 'confirmation_required' });
+});
+
+it('discover exposes the exact nested definition, widget and repair contracts', async () => {
+  const { run } = await setup();
+  const data: any = ((await run('analyst_discover', {})).json as any).data;
+  expect(data.contracts.definition.required).toEqual(
+    expect.arrayContaining([
+      'schemaVersion',
+      'source',
+      'operation',
+      'datePolicy',
+      'semanticBinding',
+    ]),
+  );
+  expect(data.contracts.definition.additionalProperties).toBe(false);
+  expect(data.contracts.widget.component.type).toBe('AnalysisWidget');
+});

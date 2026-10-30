@@ -1293,6 +1293,51 @@ async function run(client: any) {
     assert.equal(bundleBoard.userId, ids.owner);
   });
 
+  const signupExec = await call(
+    execute.POST,
+    'POST',
+    `/api/analyses/${bundled.body.analyses[0].id}/execute`,
+    ids.owner,
+    {},
+    { analysisId: bundled.body.analyses[0].id },
+  );
+  check('bundle-linked signup totals = 3 (all interior timestamps, no boundary rows)', () =>
+    assert.deepEqual(signupExec.body.rows, [{ metric: 'events', value: 3 }]),
+  );
+  // Production failure shape: ref outside AnalysisWidget props was stored unresolved/unlinked.
+  const unlinkedBefore = await counts();
+  const unlinked = await commit({
+    ...bundleBody({
+      board: {
+        type: 'mixed',
+        name: 'Unlinked',
+        parameters: {
+          rows: [
+            {
+              id: 'r',
+              columns: [
+                {
+                  id: 'w',
+                  component: {
+                    type: 'SavedAnalysis',
+                    analysisRef: 'a',
+                    props: { chartType: 'line' },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    }),
+    operationKey: 'bundle-unlinked',
+  });
+  const unlinkedAfter = await counts();
+  check('bundle with ref outside AnalysisWidget props is rejected and writes nothing', () => {
+    assert.equal(unlinked.status, 400, JSON.stringify(unlinked.body));
+    assert.deepEqual(unlinkedAfter, unlinkedBefore);
+  });
+
   const bundledExec = await call(
     execute.POST,
     'POST',
