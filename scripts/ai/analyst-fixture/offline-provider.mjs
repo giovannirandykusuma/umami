@@ -59,6 +59,14 @@ const parse = text => {
 /** Next scripted step from the transcript's tool results (pure, exported for tests). */
 export function nextStep(messages) {
   const results = messages.filter(m => m.role === 'toolResult');
+  const prompt = messages.find(m => m.role === 'user');
+  const promptText =
+    typeof prompt?.content === 'string'
+      ? prompt.content
+      : (prompt?.content ?? []).map(c => c.text ?? '').join('');
+  // Existing-board scenario: "Change board <uuid>" → readback, request_change (human confirm).
+  const target = /\bChange board ([0-9a-f-]{36})\b/.exec(promptText)?.[1];
+  if (target) return changeStep(results, target);
   const last = results.at(-1);
   const json = last ? parse(last.content?.find(c => c.type === 'text')?.text ?? '') : null;
   const committed = results
@@ -97,6 +105,25 @@ export function nextStep(messages) {
         }`,
       };
   }
+}
+
+function changeStep(results, boardId) {
+  const last = results.at(-1);
+  const json = last ? parse(last.content?.find(c => c.type === 'text')?.text ?? '') : null;
+  if (results.length === 0) return { tool: 'analyst_readback', args: { boardId } };
+  if (results.length === 1) {
+    const revision = json?.data?.board?.revision;
+    if (!revision) return { text: `Readback failed: ${json?.code ?? 'unknown'}` };
+    return {
+      tool: 'analyst_request_change',
+      args: { ...bundle('Synthetic pageviews (confirmed change)', boardId, revision) },
+    };
+  }
+  return {
+    text: json?.ok
+      ? `Offline change applied; board revision ${json.board.revision}`
+      : `Offline change not applied: ${json?.code ?? 'unknown'}`,
+  };
 }
 
 function stream(model, context, options) {

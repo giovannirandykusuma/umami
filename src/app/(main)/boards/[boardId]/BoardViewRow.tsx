@@ -20,7 +20,11 @@ export function BoardViewRow({
           flexBasis="0%"
           minWidth={`${MIN_COLUMN_WIDTH}px`}
         >
-          <BoardViewColumn component={column.component} showEntityBadge={showEntityBadges} />
+          <BoardViewColumn
+            component={column.component}
+            widgetId={column.id}
+            showEntityBadge={showEntityBadges}
+          />
         </Box>
       ))}
     </Row>

@@ -31,7 +31,7 @@ function table(widget) {
  * @param {{ capabilities: ReturnType<import('./capability.mjs').createCapabilityStore>,
  *   jobs: Map<string, { widgets: any[] }> }} options
  */
-export function createCanvasHandler({ capabilities, jobs }) {
+export function createCanvasHandler({ capabilities, jobs, renderer }) {
   /** @param {{ method: string, path: string, cookie?: string, body?: string }} request */
   return async function handle({ method, path, cookie, body }) {
     const headers = { 'Cache-Control': 'no-store', 'Content-Security-Policy': CSP };
@@ -45,12 +45,21 @@ export function createCanvasHandler({ capabilities, jobs }) {
         );
         return { status: 204, headers, body: '', session: exchanged.sessionId };
       }
-      if (method !== 'GET' || !['/canvas', '/receipt'].includes(path))
+      if (
+        method !== 'GET' ||
+        (!['/canvas', '/receipt'].includes(path) &&
+          !/^\/_next\/static\/[A-Za-z0-9_()./-]+$/.test(path))
+      )
         return { status: 403, headers, body: '' };
       const session = /(?:^|; )verifier=([A-Za-z0-9_-]+)/.exec(cookie ?? '')?.[1];
       const scope = await capabilities.resolve(session, { method });
       const job = jobs.get(scope.jobId);
       if (!job) return { status: 403, headers, body: '' };
+      if (renderer && path !== '/receipt') {
+        // The callback is trusted local bootstrap, never an origin supplied by a request/model.
+        return await renderer({ path, credential: job.credential, scope });
+      }
+      if (path.startsWith('/_next/')) return { status: 403, headers, body: '' };
       if (path === '/receipt')
         return {
           status: 200,

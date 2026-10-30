@@ -12,7 +12,11 @@ export function allowedRequest(raw, origin) {
       url.origin === origin &&
       !url.username &&
       !url.password &&
-      ['/exchange', '/canvas', '/receipt'].includes(url.pathname) &&
+      (['/exchange', '/canvas', '/receipt'].includes(url.pathname) ||
+        (/^\/_next\/static\/(?:[A-Za-z0-9_()-]+\/)*[A-Za-z0-9_.-]+\.(?:js|css|woff2?)$/.test(
+          url.pathname,
+        ) &&
+          !url.pathname.includes('..'))) &&
       !url.search &&
       !url.hash
     );
@@ -58,19 +62,33 @@ export async function renderJob({
       await context.close();
       throw new Error('cancelled_or_timeout');
     }
-    await context.route('**/*', route =>
-      allowedRequest(route.request().url(), origin) &&
-      route.request().method() === 'GET' &&
-      !route.request().redirectedFrom() &&
-      route.request().url() !== `${origin}/exchange`
+    await context.route('**/*', route => {
+      let path;
+      try {
+        path = new URL(route.request().url()).pathname;
+      } catch {
+        return route.abort();
+      }
+      return allowedRequest(route.request().url(), origin) &&
+        route.request().method() === 'GET' &&
+        !route.request().redirectedFrom() &&
+        route.request().url() !== `${origin}/exchange`
         ? transport
-          ? transport({ method: 'GET', path: new URL(route.request().url()).pathname }).then(
-              r => route.fulfill({ status: r.status, headers: r.headers, body: r.body }),
+          ? transport({ method: 'GET', path }).then(
+              r =>
+                route.fulfill({
+                  status: r.status,
+                  headers: r.headers,
+                  body:
+                    r.headers?.['X-Verifier-Encoding'] === 'base64'
+                      ? Buffer.from(r.body, 'base64')
+                      : r.body,
+                }),
               () => route.abort(),
             )
           : route.continue()
-        : route.abort(),
-    );
+        : route.abort();
+    });
     // Exchange is server-to-server, redirect disabled, not a capability-bearing URL. With a
     // private transport (network-less container) it goes over that channel, never a socket.
     const status = transport

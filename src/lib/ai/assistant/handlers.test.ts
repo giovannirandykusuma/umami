@@ -220,3 +220,18 @@ it('client stream cancellation persists cancelled', async () => {
   await vi.waitFor(() => expect(mocks.store.append).toHaveBeenCalledTimes(2));
   expect(mocks.store.append.mock.calls[1][2].status).toBe('cancelled');
 });
+it('reply and cancel reach the turn through the process-wide registry, never across modules by copy', async () => {
+  const registry = (globalThis as any)[Symbol.for('umami.assistant.runningTurns')];
+  expect(registry).toBeInstanceOf(Map);
+  // A freshly loaded handlers module (as Next may do per route) shares the same registry.
+  vi.resetModules();
+  const fresh = await import('./handlers');
+  expect((globalThis as any)[Symbol.for('umami.assistant.runningTurns')]).toBe(registry);
+  // Ownership checks still apply: no turn for this chat → reply is rejected, nothing leaks.
+  mocks.parse.mockResolvedValue({
+    auth: { user: { id: 'user' } },
+    body: { kind: 'confirm', partId: 'none', confirmed: true },
+  });
+  expect((await fresh.reply(request(), context())).status).toBe(409);
+  expect(registry.size).toBe(0);
+});

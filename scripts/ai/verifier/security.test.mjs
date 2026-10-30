@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { crc32, deflateSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import {
@@ -13,6 +15,31 @@ import {
 import { allowedRequest } from '../../../src/lib/analyst-verifier/worker.mjs';
 import { createQueue } from '../../../src/lib/analyst-verifier/queue.mjs';
 import { FIXTURE_SCOPE as scope } from './fixture-server.mjs';
+test('large worker result flushes completely before clean exit', () => {
+  // Exercise the exact final-write implementation without launching a browser or exposing data.
+  const source = readFileSync(new URL('./container-worker.mjs', import.meta.url), 'utf8');
+  const finish = source.slice(
+    source.indexOf('async function finish('),
+    source.indexOf('const waiting ='),
+  );
+  const payloadBytes = 2 * 1024 * 1024;
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `${finish}\nawait finish({type:'result',data:'x'.repeat(${payloadBytes})});process.exit(0);`,
+    ],
+    { maxBuffer: 4 * 1024 * 1024, timeout: 10_000 },
+  );
+  assert.equal(child.status, 0);
+  assert.equal(
+    child.stdout.length,
+    payloadBytes + Buffer.byteLength('{"type":"result","data":""}\n'),
+  );
+  assert.equal(JSON.parse(child.stdout).data.length, payloadBytes);
+});
+
 function chunk(type, data) {
   const header = Buffer.alloc(4);
   header.writeUInt32BE(data.length);
@@ -117,6 +144,14 @@ test('revocation during asynchronous exchange cannot resurrect a session', async
 test('exact origin and endpoint allowlist rejects metadata, redirects and credentials', () => {
   const origin = 'http://127.0.0.1:4319';
   assert.equal(allowedRequest(`${origin}/canvas`, origin), true);
+  assert.equal(
+    allowedRequest(
+      `${origin}/_next/static/chunks/app/(verifier)/verifier-canvas/page-abc.js`,
+      origin,
+    ),
+    true,
+  );
+  assert.equal(allowedRequest(`${origin}/_next/static/media/font.woff2`, origin), true);
   for (const url of [
     'http://169.254.169.254/latest',
     'http://localhost:4319/canvas',
@@ -126,6 +161,11 @@ test('exact origin and endpoint allowlist rejects metadata, redirects and creden
     'http://user:pass@127.0.0.1:4319/canvas',
     'file:///etc/passwd',
     `${origin}/exchange#secret`,
+    `${origin}/_next/static/../secret.js`,
+    `${origin}/_next/static/%2e%2e/secret.js`,
+    `${origin}/_next/static/chunks/app.js?url=http://evil`,
+    `${origin}/_next/static/chunks/evil.html`,
+    `${origin}/_next/static/chunks/%2fsecret.js`,
   ])
     assert.equal(allowedRequest(url, origin), false);
 });

@@ -1,27 +1,29 @@
 'use client';
 
 import { Button, Column, Dialog, Modal, Row, Text, TextField } from '@umami/react-zen';
-import { useEffect, useRef, useState } from 'react';
 import ChartJS from 'chart.js/auto';
+import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { PageBody } from '@/components/common/PageBody';
-import { useLoginQuery } from '@/components/hooks';
+import { useLoginQuery } from '@/components/hooks/queries/useLoginQuery';
 import { ArrowUp, Check, History, Plus, Sparkles, Square, X } from '@/components/icons';
 import {
+  type AnalystPhase,
+  type AnalystTaskStatus,
   ASSISTANT_API,
-  applyAssistantEvent,
   type AssistantChat,
   type AssistantChatSummary,
   type AssistantPart,
   type AssistantReply,
+  applyAssistantEvent,
 } from '@/lib/ai/assistant/protocol';
 import { getApiUrl } from '@/lib/api-url';
 import { getClientAuthToken } from '@/lib/client';
 import { BoardComponentRenderer } from '../boards/[boardId]/BoardComponentRenderer';
-import { readAssistantStream } from './stream';
-import { ResultChart } from './ResultChart';
 import styles from './AssistantPage.module.css';
+import { ResultChart } from './ResultChart';
+import { readAssistantStream } from './stream';
 
 // Streaming inserts charts during layout; avoid animating from their initial narrow measurement.
 ChartJS.register({
@@ -45,8 +47,13 @@ async function request(path: string, method = 'GET', data?: unknown, signal?: Ab
     },
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
   });
-  if (!response.ok)
-    throw new Error(`Assistant request failed (${response.status}). Please try again.`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw Object.assign(
+      new Error(`Assistant request failed (${response.status}). Please try again.`),
+      { body },
+    );
+  }
   return response;
 }
 
@@ -89,6 +96,7 @@ export function AssistantPage() {
     kind: 'rename' | 'delete';
   } | null>(null);
   const [title, setTitle] = useState('');
+  const [task, setTask] = useState<TaskView | null>(null);
   const controller = useRef<AbortController | null>(null);
   const selection = useRef(0);
   const log = useRef<HTMLDivElement>(null);
@@ -128,6 +136,7 @@ export function AssistantPage() {
   }
   async function openChat(id: string) {
     const version = ++selection.current;
+    setTask(null);
     setLoading(true);
     setError('');
     setHistory(false);
@@ -153,9 +162,18 @@ export function AssistantPage() {
         setError((e as Error).message);
       }
   }
+  async function refreshTask(taskId: string) {
+    try {
+      const detail = await (await request(`/analyst/tasks/${taskId}`)).json();
+      setTask(value => (value?.taskId === taskId ? { ...value, ...detail, taskId } : value));
+    } catch {
+      // Detail is optional; the streamed status/phase stays authoritative.
+    }
+  }
   async function send() {
     if (!draft.trim() || busy || loading) return;
     const text = draft.trim();
+    let taskId = '';
     setStartedAt(Date.now());
     setBusy(true);
     setError('');
@@ -203,6 +221,17 @@ export function AssistantPage() {
           );
         }
         if (event.type === 'error') setError(event.error);
+        if (event.type === 'task') {
+          taskId = event.taskId;
+          setTask(value => ({
+            ...(value?.taskId === event.taskId ? value : {}),
+            taskId: event.taskId,
+            status: event.status,
+            phase: event.phase,
+          }));
+          if (event.status !== 'running' || ['render', 'inspect'].includes(event.phase))
+            void refreshTask(event.taskId);
+        }
         const previousId = messageId;
         if (event.type === 'start') messageId = event.messageId;
         setChat(value =>
@@ -227,6 +256,12 @@ export function AssistantPage() {
         );
       });
     } catch (e) {
+      const body = (e as { body?: { status?: string; taskId?: string; error?: string } }).body;
+      if (body?.status === 'blocked') {
+        // Durable host state: the task cannot continue; never shown as running or complete.
+        taskId = body.taskId ?? '';
+        setTask({ taskId, status: 'blocked', phase: null, blockedReason: body.error });
+      }
       if (!abort.signal.aborted) setError((e as Error).message);
       setChat(
         value =>
@@ -253,6 +288,7 @@ export function AssistantPage() {
             },
         );
       controller.current = null;
+      if (taskId) void refreshTask(taskId);
       setBusy(false);
       input.current?.focus();
     }
@@ -295,6 +331,7 @@ export function AssistantPage() {
               onPress={() => {
                 ++selection.current;
                 setChat(null);
+                setTask(null);
                 setLoading(false);
                 setError('');
                 setHistory(false);
@@ -437,6 +474,7 @@ export function AssistantPage() {
                     </article>
                   ))
                 )}
+                {task && <TaskPanel task={task} />}
                 {busy && (
                   <Activity
                     startedAt={startedAt}
@@ -615,6 +653,75 @@ function InlineChart({ children }: { children: React.ReactNode }) {
 }
 
 // Model-generated navigation is restricted to same-origin app paths, not external URLs.
+type TaskView = {
+  taskId: string;
+  status: AnalystTaskStatus;
+  phase: AnalystPhase | null;
+  blockedReason?: string | null;
+  receipts?: {
+    id: string;
+    boardId: string;
+    boardRevision: number;
+    status: 'rendered_not_inspected' | 'inspected';
+    views: { hash: string; width: number; height: number }[];
+  }[];
+};
+
+const STATUS_LABEL: Record<AnalystTaskStatus, string> = {
+  running: 'Running',
+  awaiting_user: 'Waiting for you',
+  blocked: 'Blocked',
+  complete: 'Complete',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+};
+
+/**
+ * Host-derived analyst task status (SSE `task` event + sanitized task detail). Render receipts
+ * are shown as recorded: "rendered, not inspected" is never presented as visually verified.
+ */
+export function TaskPanel({ task }: { task: TaskView }) {
+  return (
+    <section
+      className={styles.card}
+      aria-label="Analyst task"
+      data-task-status={task.status}
+      data-task-phase={task.phase ?? undefined}
+    >
+      <h3>
+        Analyst task · {STATUS_LABEL[task.status]}
+        {task.phase && task.status === 'running' ? ` · ${task.phase.replace(/_/g, ' ')}` : ''}
+      </h3>
+      {task.status === 'blocked' && (
+        <p role="alert">
+          This task is blocked{task.blockedReason ? ` (${task.blockedReason})` : ''}. Start a new
+          request to continue.
+        </p>
+      )}
+      {(task.status === 'cancelled' || task.status === 'expired') && (
+        <p className={styles.muted}>No further changes will be made by this task.</p>
+      )}
+      {task.receipts?.length ? (
+        <dl className={styles.resultMeta} aria-label="Render receipts">
+          {task.receipts.map(receipt => (
+            <div key={receipt.id} data-receipt-status={receipt.status}>
+              <dt>
+                <a href={`/boards/${receipt.boardId}`}>Board</a> revision {receipt.boardRevision}
+              </dt>
+              <dd>
+                {receipt.status === 'inspected'
+                  ? 'Rendered and inspected'
+                  : 'Rendered, not visually verified'}{' '}
+                · {receipt.views.map(v => `${v.width}×${v.height}`).join(', ')}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
 function isAppPath(href: string) {
   if (!href.startsWith('/') || href.startsWith('//') || href.includes('\\')) return false;
   try {
@@ -622,6 +729,50 @@ function isAppPath(href: string) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Existing-board change request (analyst_request_change): the host serializes target, revision,
+ * diff hash and widget/analysis changes as JSON. Anything else is legacy plain text.
+ */
+function ConfirmDiff({ message }: { message: string }) {
+  let diff: any;
+  try {
+    diff = JSON.parse(message);
+  } catch {
+    return <p>{message}</p>;
+  }
+  if (!diff || typeof diff !== 'object' || !Array.isArray(diff.added)) return <p>{message}</p>;
+  const list = (label: string, items: string[]) => (
+    <>
+      <dt>{label}</dt>
+      <dd>{items.length ? items.join(', ') : 'None'}</dd>
+    </>
+  );
+  return (
+    <dl className={styles.resultMeta} aria-label="Proposed changes">
+      <dt>Board</dt>
+      <dd>
+        {String(diff.target)} at revision {String(diff.expectedRevision)}
+      </dd>
+      {list('Widgets added', diff.added)}
+      {list('Widgets removed', diff.removed ?? [])}
+      {list('Widgets changed', diff.changed ?? [])}
+      <dt>New analyses</dt>
+      <dd>
+        {(diff.newAnalyses ?? []).length
+          ? diff.newAnalyses
+              .map(
+                (a: any) =>
+                  `${a.metric} (${a.operation}, ${a.datePolicy?.type === 'fixed' ? 'fixed range' : `rolling ${a.datePolicy?.window}`}, ${a.timezone})`,
+              )
+              .join('; ')
+          : 'None'}
+      </dd>
+      <dt>Impact</dt>
+      <dd>Nothing changes unless you confirm. A newer board revision cancels this request.</dd>
+    </dl>
+  );
 }
 
 export function Part({
@@ -741,9 +892,9 @@ export function Part({
       );
     case 'confirm':
       return (
-        <section className={styles.card}>
-          <h3>{part.title}</h3>
-          <p>{part.message}</p>
+        <section className={styles.card} aria-labelledby={`confirm-${part.id}`}>
+          <h3 id={`confirm-${part.id}`}>{part.title}</h3>
+          <ConfirmDiff message={part.message} />
           {part.state === 'pending' && active && !submitted ? (
             <Row gap="2">
               <Button
@@ -753,6 +904,7 @@ export function Part({
                 Confirm
               </Button>
               <Button
+                autoFocus
                 isDisabled={pending}
                 onPress={() => void respond({ partId: part.id, kind: 'confirm', confirmed: false })}
               >

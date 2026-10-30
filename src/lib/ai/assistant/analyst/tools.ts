@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { getResolvedComponentEntity } from '@/lib/boards';
 import { z } from 'zod';
 import {
   AnalysisError,
@@ -637,10 +638,22 @@ async function verifyRender(
   const analysisRevisions: Record<string, number> = {};
   const expectedWidgets = [];
   for (const w of widgets(board.parameters)) {
+    if (w.component?.type === 'WebsiteMetricsBar') {
+      const { entityType, entityId } = getResolvedComponentEntity(board as any, w.component);
+      if (entityType !== 'website' || !entityId)
+        return { json: fail('unsupported_combination', 'Native source is unsupported') };
+      const definitionHash = createHash('sha256').update(JSON.stringify({
+        type: w.component.type, entityId, datePolicy: 'default-UTC', props: w.component.props ?? {},
+      })).digest('hex');
+      expectedWidgets.push({ id: w.id, executionId: '', definitionHash });
+      continue;
+    }
     const id = w.component?.props?.analysisId;
-    if (typeof id !== 'string') continue;
+    if (w.component?.type !== 'AnalysisWidget' || typeof id !== 'string')
+      return { json: fail('unsupported_combination', 'Widget is unsupported by the verifier') };
     const analysis = await input.deps.getAnalysis(id);
-    if (!analysis) return { json: fail('not_found', 'Analysis not found') };
+    if (!analysis || !(await input.deps.canViewAnalysis(input.auth, analysis)))
+      return { json: fail('not_found', 'Analysis not found') };
     analysisRevisions[id] = analysis.revision;
     expectedWidgets.push({ id: w.id, executionId: '', definitionHash: analysis.definitionHash });
   }

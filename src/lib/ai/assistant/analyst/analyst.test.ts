@@ -584,6 +584,61 @@ it('verified render yields images only on the transient path; receipts hold hash
   expect((await getTask(scope))!.budgets.consumed.renders).toBe(2);
 });
 
+it('render expectations include every saved native and analysis widget and reject unsupported widgets', async () => {
+  const render = vi.fn(async (_input: any) => {
+    throw new Error('stop after binding');
+  });
+  const { run, boards } = await setup({
+    verifier: { render, fetch: vi.fn(), discard: vi.fn(), cleanup: vi.fn() },
+    getAnalysis: async id => ({
+      id,
+      revision: 2,
+      definitionHash: 'saved-hash',
+      definition: {},
+      userId: USER,
+      teamId: null,
+      status: 'ready',
+    }),
+  });
+  const board = {
+    id: BOARD,
+    revision: 3,
+    userId: USER,
+    teamId: null,
+    type: 'mixed',
+    parameters: {
+      rows: [
+        {
+          id: 'row',
+          columns: [
+            {
+              id: 'native',
+              component: { type: 'WebsiteMetricsBar', entityType: 'website', entityId: SITE },
+            },
+            { id: 'analysis', component: { type: 'AnalysisWidget', props: { analysisId: OTHER } } },
+          ],
+        },
+      ],
+    },
+  };
+  boards.set(BOARD, board);
+  await run('analyst_verify_render', { boardId: BOARD });
+  expect(render).toHaveBeenCalledOnce();
+  expect(render.mock.calls[0][0]).toMatchObject({
+    scope: { boardId: BOARD, boardRevision: 3, analysisRevisions: { [OTHER]: 2 } },
+    expectedWidgets: [
+      { id: 'native', executionId: '', definitionHash: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      { id: 'analysis', executionId: '', definitionHash: 'saved-hash' },
+    ],
+  });
+  board.parameters.rows[0].columns[0].component.type = 'WorldMap';
+  expect((await run('analyst_verify_render', { boardId: BOARD })).json).toMatchObject({
+    ok: false,
+    code: 'unsupported_combination',
+  });
+  expect(render).toHaveBeenCalledOnce();
+});
+
 it('sanitizes image blocks, data URLs and capabilities while keeping session structure', () => {
   const data = Buffer.from(MARKER.repeat(100)).toString('base64');
   const line = (v: any) => JSON.stringify(v);

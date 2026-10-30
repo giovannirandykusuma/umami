@@ -27,7 +27,14 @@ const analystModules = async () => ({
 
 type Context = { params: Promise<{ chatId?: string }> };
 type Turn = { userId: string; controller: AbortController; interaction: Interaction };
-const running = new Map<string, Turn>();
+/**
+ * Active turns, shared by every route module in THIS process (Next dev may load the turn, reply
+ * and cancel routes as separate module instances). Not persisted and not cross-process: a reply
+ * or cancel served by another process finds no turn and is rejected.
+ */
+const TURNS = Symbol.for('umami.assistant.runningTurns');
+const shared = globalThis as typeof globalThis & { [TURNS]?: Map<string, Turn> };
+const running = (shared[TURNS] ??= new Map<string, Turn>());
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const missing = () => json({ error: 'Chat not found' }, 404);
 const validTitle = (value: unknown): value is string =>

@@ -1,28 +1,19 @@
 'use client';
 import { Loading, useToast } from '@umami/react-zen';
-import { createContext, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuid } from 'uuid';
-import { useApi, useMessages, useModified, useNavigation } from '@/components/hooks';
+import { useApi } from '@/components/hooks/useApi';
+import { useMessages } from '@/components/hooks/useMessages';
+import { useModified } from '@/components/hooks/useModified';
+import { useNavigation } from '@/components/hooks/useNavigation';
 import { useBoardQuery } from '@/components/hooks/queries/useBoardQuery';
 import { BOARD_TYPES, getBoardType } from '@/lib/boards';
 import type { Board, BoardParameters } from '@/lib/types';
 import { getComponentDefinition } from './boardComponentRegistry';
 
-export type LayoutGetter = () => Partial<BoardParameters> | null;
+import { BoardContext, type LayoutGetter } from './BoardContext';
 
-export interface BoardContextValue {
-  board: Partial<Board>;
-  editing: boolean;
-  updateBoard: (data: Partial<Board>) => void;
-  saveBoard: () => Promise<Board>;
-  isPending: boolean;
-  registerLayoutGetter: (getter: LayoutGetter) => void;
-  aiPending?: boolean;
-  setAiPending?: (pending: boolean) => void;
-  registerAiCancel?: (cancel: (() => void) | null) => void;
-}
-
-export const BoardContext = createContext<BoardContextValue>(null);
+export { BoardContext, type BoardContextValue, type LayoutGetter } from './BoardContext';
 
 const createDefaultBoard = (): Partial<Board> => ({
   type: BOARD_TYPES.mixed,

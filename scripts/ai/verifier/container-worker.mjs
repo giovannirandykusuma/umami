@@ -7,6 +7,27 @@ import { renderJob } from '../../../src/lib/analyst-verifier/worker.mjs';
 import { createArtifactStore } from '../../../src/lib/analyst-verifier/images.mjs';
 
 const send = message => process.stdout.write(`${JSON.stringify(message)}\n`);
+
+// A clean process exit does not flush a pipe. Await the write callback for the bounded final
+// result (including screenshots); never log images or credentials when reporting transport loss.
+async function finish(message) {
+  const line = `${JSON.stringify(message)}\n`;
+  if (Buffer.byteLength(line) > 16 * 1024 * 1024) throw new Error('result_too_large');
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('stdout_timeout')), 5000);
+    const onError = () => {
+      clearTimeout(timeout);
+      reject(new Error('stdout_failed'));
+    };
+    process.stdout.once('error', onError);
+    process.stdout.write(line, error => {
+      clearTimeout(timeout);
+      process.stdout.removeListener('error', onError);
+      if (error) reject(new Error('stdout_failed'));
+      else resolve();
+    });
+  });
+}
 const waiting = new Map();
 let sequence = 0;
 const request = (type, payload) =>
@@ -52,14 +73,18 @@ createInterface({ input: process.stdin }).on('line', async line => {
     });
     const images = await artifacts.get(result.artifactId, message.scope);
     await browser.close();
-    send({
+    await finish({
       type: 'result',
       receipt: result.receipt,
       images: images.map(image => ({ mime: image.mime, data: image.bytes.toString('base64') })),
     });
   } catch {
     await browser?.close();
-    send({ type: 'failure', code: 'render_unavailable' });
+    try {
+      await finish({ type: 'failure', code: 'render_unavailable' });
+    } catch {
+      process.exit(1);
+    }
   }
   process.exit(0);
 });

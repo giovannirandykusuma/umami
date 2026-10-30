@@ -1,5 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { useContext } from 'react';
+import { useBoard } from '@/components/hooks/context/useBoard';
+import { BoardContext as SharedBoardContext } from './BoardContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardContext, BoardProvider, type BoardContextValue } from './BoardProvider';
 
@@ -18,22 +20,30 @@ vi.mock('@/components/hooks/queries/useBoardQuery', () => ({
   useBoardQuery: () => ({ data: mocks.data }),
 }));
 vi.mock('./boardComponentRegistry', () => ({ getComponentDefinition: () => ({}) }));
-vi.mock('@/components/hooks', () => ({
+vi.mock('@/components/hooks/useApi', () => ({
   useApi: () => ({
     post: mocks.post,
     useMutation: ({ mutationFn }: any) => ({ mutateAsync: mutationFn, isPending: false }),
   }),
+}));
+vi.mock('@/components/hooks/useModified', () => ({
   useModified: () => ({ touch: mocks.touch }),
+}));
+vi.mock('@/components/hooks/useMessages', () => ({
   useMessages: () => ({
     t: (s: string) => s,
     labels: { untitled: 'Untitled' },
     messages: { saved: 'Saved' },
   }),
+}));
+vi.mock('@/components/hooks/useNavigation', () => ({
   useNavigation: () => ({ router: { push: mocks.push }, renderUrl: (s: string) => s }),
 }));
 let context: BoardContextValue;
 function Probe() {
   context = useContext(BoardContext);
+  expect(BoardContext).toBe(SharedBoardContext);
+  expect(useBoard()).toBe(context);
   return <span>{context.board.name}</span>;
 }
 beforeEach(() => vi.clearAllMocks());

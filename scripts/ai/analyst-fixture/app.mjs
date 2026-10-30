@@ -12,6 +12,7 @@ import {
   existsSync,
   mkdtempSync,
   realpathSync,
+  readFileSync,
   statSync,
   readdirSync,
   rmSync,
@@ -19,6 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const FIXTURE_DATABASE =
   'postgresql://ai_synthetic@127.0.0.1:25432/ai_synthetic?schema=analyst_fixture';
@@ -71,6 +73,18 @@ export function sanitizedProject(checkout, nonce) {
       dereference: true,
       filter: source => !isEnvFile(basename(source)) && !source.includes('/node_modules'),
     });
+  // Limit webpack's development footprint only in this disposable copy. Do not
+  // retain every compiled route: that exhausted heap/swap with two dev instances.
+  const config = join(dir, 'next.config.ts');
+  const source = readFileSync(config, 'utf8');
+  if (!source.includes('reactStrictMode: false,')) throw new Error('Fixture config anchor missing');
+  writeFileSync(
+    config,
+    source.replace(
+      'reactStrictMode: false,',
+      'reactStrictMode: false,\n  webpack: (config) => { config.cache = false; config.parallelism = 1; return config; },',
+    ),
+  );
   // Dependencies are shared read-only (symlink); nothing is written through it.
   symlinkSync(join(checkout, 'node_modules'), join(dir, 'node_modules'));
   mkdirSync(join(dir, '.home'));
@@ -88,33 +102,45 @@ export function sanitizedProject(checkout, nonce) {
   return dir;
 }
 
-export function fixtureEnv({ dir, port, nonce, piRoot, verifier }) {
+/**
+ * `flagsOff`: explicit synthetic default-off mode (AI_ANALYST_ENABLED and the verifier flag unset,
+ * so lifecycle creation is disabled while saved-analysis execution stays available). The offline
+ * fixture runtime is analyst-only, so it is also omitted; there is no live fallback either way.
+ */
+export function fixtureEnv({ dir, port, nonce, piRoot, verifier, flagsOff = false }) {
   return {
     PATH: process.env.PATH,
     // Fixture-owned home/tmp: Pi scratch ancestors never include shared host dirs like /tmp/.pi.
     HOME: join(dir, '.home'),
     TMPDIR: join(dir, '.home'),
     NODE_ENV: 'development',
+    NODE_OPTIONS: '--max-old-space-size=2048',
     PORT: port,
     NEXT_TELEMETRY_DISABLED: '1',
     DATABASE_URL: FIXTURE_DATABASE,
     APP_SECRET: 'synthetic-analyst-fixture-only',
-    AI_ANALYST_ENABLED: 'true',
-    AI_OFFLINE_FIXTURE: 'analyst-synthetic-v1',
-    AI_OFFLINE_FIXTURE_NONCE: nonce,
-    AI_PI_ROOT: piRoot,
-    ...(verifier
+    ...(flagsOff
+      ? {}
+      : {
+          AI_ANALYST_ENABLED: 'true',
+          AI_OFFLINE_FIXTURE: 'analyst-synthetic-v1',
+          AI_OFFLINE_FIXTURE_NONCE: nonce,
+          AI_PI_ROOT: piRoot,
+        }),
+    ...(verifier && !flagsOff
       ? { AI_ANALYST_VERIFIER_ENABLED: 'true', AI_ANALYST_VERIFIER_LAUNCHER: 'docker' }
       : {}),
   };
 }
 
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = process.env.ANALYST_FIXTURE_PORT ?? '3327';
   if (!/^\d+$/.test(port) || ['3000', '3317'].includes(port))
     throw new Error('Refusing shared port');
+  const flagsOff = process.env.ANALYST_FIXTURE_FLAGS === 'off';
   const piRoot = process.env.AI_PI_ROOT;
-  if (!piRoot) throw new Error('AI_PI_ROOT (pinned Pi install) required for the offline turn');
+  if (!piRoot && !flagsOff)
+    throw new Error('AI_PI_ROOT (pinned Pi install) required for the offline turn');
   const verifier =
     spawnSync('docker', ['image', 'inspect', 'umami-analyst-verifier:local'], { stdio: 'ignore' })
       .status === 0;
@@ -127,16 +153,26 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     env: { PATH: process.env.PATH, HOME: '/tmp', DATABASE_URL: FIXTURE_DATABASE },
   });
   if (generated.status !== 0) throw new Error('prisma generate failed');
-  console.log(JSON.stringify({ fixtureProject: dir, verifier }));
+  console.log(JSON.stringify({ fixtureProject: dir, verifier, flagsOff }));
   const child = spawn(
     join(dir, 'node_modules/.bin/next'),
     ['dev', '--webpack', '--hostname', '127.0.0.1', '--port', port],
-    { cwd: dir, stdio: 'inherit', env: fixtureEnv({ dir, port, nonce, piRoot, verifier }) },
+    {
+      cwd: dir,
+      stdio: 'inherit',
+      env: fixtureEnv({ dir, port, nonce, piRoot, verifier, flagsOff }),
+    },
   );
   const stop = signal => child.kill(signal);
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => stop(signal));
-  child.on('exit', code => {
-    rmSync(dir, { recursive: true, force: true });
+  child.on('exit', (code, signal) => {
+    if (code === 0) {
+      rmSync(dir, { recursive: true, force: true });
+    } else {
+      // Retain synthetic-only compiler traces on failure; never print the nonce,
+      // auth tokens or request bodies. MAIN can inspect and remove this owned temp.
+      console.error(JSON.stringify({ fixtureFailure: { code, signal, project: dir } }));
+    }
     process.exit(code ?? 1);
   });
 }

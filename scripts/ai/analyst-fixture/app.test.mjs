@@ -1,17 +1,18 @@
 // Env-canary: Next's own loader must find nothing in the sanitized fixture project even when the
 // checkout holds every .env variant Next auto-loads.
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
 import {
   cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -75,6 +76,15 @@ test('sanitized fixture project: no .env file copied, Next loads nothing', () =>
       assert.equal(existsSync(join(project, 'src', name)), false);
     }
     const { loadedEnvFiles, canary, key } = load(project);
+    const config = readFileSync(join(project, 'next.config.ts'), 'utf8');
+    assert.match(config, /config\.cache = false; config\.parallelism = 1/);
+    assert.doesNotMatch(config, /config\.devtool = false/);
+    assert.doesNotMatch(
+      readFileSync(join(checkout, 'next.config.ts'), 'utf8'),
+      /config\.devtool = false/,
+    );
+    assert.doesNotMatch(config, /onDemandEntries/);
+    assert.doesNotMatch(readFileSync(join(checkout, 'next.config.ts'), 'utf8'), /onDemandEntries/);
     assert.deepEqual(loadedEnvFiles, []);
     assert.equal(canary, undefined);
     assert.equal(key, undefined);
@@ -102,6 +112,7 @@ test('child env is an explicit allowlist with no live provider keys', () => {
   ])
     assert.equal(env[key], undefined);
   assert.equal(env.NODE_ENV, 'development');
+  assert.equal(env.NODE_OPTIONS, '--max-old-space-size=2048');
   assert.equal(env.TMPDIR, '/fixture/.home');
   assert.equal(env.AI_OFFLINE_FIXTURE, 'analyst-synthetic-v1');
 });
@@ -128,4 +139,26 @@ test('systemTemp ignores $TMPDIR (e.g. repo scratch) and refuses discovery ances
   } finally {
     rmSync(poisoned, { recursive: true, force: true });
   }
+});
+
+test('flags-off mode leaves analyst, offline runtime and verifier flags unset', () => {
+  const env = fixtureEnv({
+    dir: '/fixture',
+    port: '3327',
+    nonce: 'ab'.repeat(32),
+    piRoot: '/pi',
+    verifier: true,
+    flagsOff: true,
+  });
+  for (const key of [
+    'AI_ANALYST_ENABLED',
+    'AI_OFFLINE_FIXTURE',
+    'AI_OFFLINE_FIXTURE_NONCE',
+    'AI_PI_ROOT',
+    'AI_ANALYST_VERIFIER_ENABLED',
+    'AI_ANALYST_VERIFIER_LAUNCHER',
+    'AI_PROVIDER',
+  ])
+    assert.equal(env[key], undefined, key);
+  assert.equal(env.DATABASE_URL.endsWith('schema=analyst_fixture'), true);
 });

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { applyAssistantEvent } from '@/lib/ai/assistant/protocol';
-import { Activity, historyGroup, Part } from './AssistantPage';
+import { Activity, historyGroup, Part, TaskPanel } from './AssistantPage';
 import { readAssistantStream } from './stream';
 
 vi.mock('../boards/[boardId]/BoardComponentRenderer', () => ({
@@ -293,5 +293,47 @@ describe('SSE reader', () => {
         vi.fn(),
       ),
     ).rejects.toThrow('interrupted');
+  });
+});
+
+describe('TaskPanel', () => {
+  it('shows a durable blocked state as an alert, never as running', () => {
+    render(
+      <TaskPanel
+        task={{ taskId: 't', status: 'blocked', phase: null, blockedReason: 'deadline' }}
+      />,
+    );
+    expect(screen.getByRole('alert').textContent).toContain('blocked (deadline)');
+    expect(screen.getByLabelText('Analyst task').dataset.taskStatus).toBe('blocked');
+  });
+
+  it('labels uninspected render receipts honestly', () => {
+    render(
+      <TaskPanel
+        task={{
+          taskId: 't',
+          status: 'running',
+          phase: 'render',
+          receipts: [
+            {
+              id: 'r',
+              boardId: 'b',
+              boardRevision: 2,
+              status: 'rendered_not_inspected',
+              views: [{ hash: 'h', width: 1280, height: 800 }],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByLabelText('Render receipts').textContent).toContain(
+      'Rendered, not visually verified',
+    );
+    expect(screen.queryByText(/inspected$/)).toBeNull();
+  });
+
+  it('marks cancelled tasks as final', () => {
+    render(<TaskPanel task={{ taskId: 't', status: 'cancelled', phase: 'render' }} />);
+    expect(screen.getByText(/No further changes/)).toBeTruthy();
   });
 });

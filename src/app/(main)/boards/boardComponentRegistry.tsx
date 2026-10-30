@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { AnalysisWidget } from '@/app/(main)/boards/AnalysisWidget';
 import { WebsiteCompareChart } from '@/app/(main)/boards/WebsiteCompareChart';
 import { TextBlock } from '@/app/(main)/boards/TextBlock';
 import { BoardFunnel } from '@/app/(main)/websites/[websiteId]/(reports)/funnels/BoardFunnel';
@@ -93,16 +94,7 @@ const METRIC_TYPES = [
 ];
 
 const PIXEL_LINK_METRIC_TYPES = METRIC_TYPES.filter(({ value }) =>
-  [
-    'referrer',
-    'channel',
-    'browser',
-    'os',
-    'device',
-    'country',
-    'region',
-    'city',
-  ].includes(value),
+  ['referrer', 'channel', 'browser', 'os', 'device', 'country', 'region', 'city'].includes(value),
 );
 
 const LIMIT_OPTIONS = [
@@ -442,7 +434,23 @@ const componentDefinitions: ComponentDefinition[] = [
   },
 ];
 
-const definitionMap = new Map(componentDefinitions.map(def => [def.type, def]));
+/**
+ * Saved-analysis widgets are created by the analyst lifecycle (they need an analysisId), so they
+ * render on boards but are not offered in the manual component picker.
+ */
+const analysisWidgetDefinition: ComponentDefinition = {
+  type: 'AnalysisWidget',
+  name: 'Saved analysis',
+  description: 'Live result of a saved analysis definition',
+  category: 'visualization',
+  icon: Sheet,
+  component: AnalysisWidget,
+  requiresWebsite: false,
+};
+
+const definitionMap = new Map(
+  [...componentDefinitions, analysisWidgetDefinition].map(def => [def.type, def]),
+);
 
 export function getComponentDefinitions(): ComponentDefinition[] {
   return componentDefinitions;
